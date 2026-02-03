@@ -176,7 +176,7 @@
         /* --- MEAL PLAN DASHBOARD --- */
         .meal-plan-calendar {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 10px;
         }
         .meal-day-column {
@@ -526,7 +526,6 @@
     const storage = getStorage(app); 
 
     const recipesCollection = collection(db, 'recipes');
-    // App-wide data stored in 'appData' collection, each doc is a type of data
     const appDataDocFavs = doc(db, 'appData', 'favorites');
     const appDataDocPlan = doc(db, 'appData', 'mealPlan');
     const appDataDocCats = doc(db, 'appData', 'categories');
@@ -580,7 +579,6 @@
 
     // --- DATA HANDLING ---
     async function loadGlobalData() {
-        alert("DEBUG: Loading global data (favorites, meal plan, categories)...");
         try {
             const [favSnap, planSnap, catSnap] = await Promise.all([
                 getDoc(appDataDocFavs),
@@ -835,28 +833,27 @@
             });
             if(changed) await saveGlobalMealPlan();
 
-            alert("DEBUG: Reloading recipes and refreshing UI after deletion.");
-            await loadRecipes(); 
-            showView(document.querySelector('.view-toggle button.active').id.replace('view','').toLowerCase().replace('btn','')); 
+            await loadRecipes(); // Reload all recipes
+            showView(document.querySelector('.view-toggle button.active').id.replace('view','').toLowerCase().replace('btn','')); // Refresh current view
         } catch (e) {
-            alert(`ERROR: Failed to delete recipe. Error: ${e.message || "Unknown error"}. Check Firebase Console rules.`);
+            alert(`ERROR: Failed to delete recipe. Error: ${e.message || "Unknown error"}. Check Firebase Console for exact details.`);
             console.error("Error deleting recipe:", e);
         }
     }
 
     async function saveRecipe(data) {
-        alert("DEBUG: saveRecipe function called.");
         const btn = document.getElementById('btnSave');
         btn.textContent = "Saving..."; btn.disabled = true;
         
         try {
+            alert("DEBUG: saveRecipe function called, starting image/data processing.");
             let imageUrl = null; 
             const editId = data.id; 
 
             // --- IMAGE UPLOAD LOGIC ---
             if (currentImageFile) { 
                 alert("DEBUG: Image file detected. Attempting to upload to Storage...");
-                const imageId = `recipe-${crypto.randomUUID()}`; 
+                const imageId = `recipe-${(window.crypto || crypto).randomUUID()}`; // Use window.crypto for broader compatibility
                 const storageRef = ref(storage, `recipe_images/${imageId}`);
                 
                 try {
@@ -881,7 +878,6 @@
                 } catch (imgError) {
                     alert(`ERROR: Image upload failed: ${imgError.message}. Check Firebase Storage rules.`); 
                     console.error("Image upload failed:", imgError);
-                    // Critical error, re-enable button and exit
                     btn.textContent = "Save Recipe"; btn.disabled = false;
                     return; 
                 }
@@ -899,17 +895,20 @@
             } else {
                 const newDocRef = await addDoc(recipesCollection, data);
                 alert("DEBUG: New recipe successfully added to Firestore!");
-                data.id = newDocRef.id; // Assign the ID from Firestore to the local data object
+                data.id = newDocRef.id; 
             }
             
             alert("DEBUG: Reloading all recipes from Cloud and refreshing UI...");
             await loadRecipes(); 
             showView(document.querySelector('.view-toggle button.active').id.replace('view','').toLowerCase().replace('btn','')); 
-            closeModals();
+            
+            alert("DEBUG: Calling closeModals()..."); // Alert before calling
+            closeModals(); // This is where the error occurred before
+
             alert("DEBUG: Save process completed successfully!");
 
         } catch(error) {
-            alert(`CRITICAL ERROR: Recipe save failed: ${error.message}. This could be a Firebase rule, network issue, or data problem. Check Firebase Console for exact error.`); 
+            alert(`CRITICAL ERROR: Recipe save failed: ${error.message}. This could be a Firebase rule, network issue, or a JavaScript error (e.g., function not found).`); 
             console.error("Critical error during save process:", error);
         } finally {
             btn.textContent = "Save Recipe"; btn.disabled = false;
@@ -918,6 +917,14 @@
     }
 
     // --- MODALS ---
+    function closeModals() {
+        alert("DEBUG: closeModals() function entered."); // Alert inside function
+        document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
+        releaseWakeLock(); 
+        stopTimer(); 
+        alert("DEBUG: closeModals() function finished."); // Alert at end of function
+    }
+
     function openDetail(r) {
         activeRecipeId = r.id;
         document.getElementById('detTitle').textContent = r.title;
@@ -1129,14 +1136,14 @@
 
     // --- FORM SUBMISSION ---
     document.getElementById('recipeForm').onsubmit = async (e) => {
-        alert("DEBUG: Form submit handler started."); // Alert at start of handler
-        e.preventDefault(); // THIS IS THE CRITICAL LINE TO STOP RELOAD
-        alert("DEBUG: Default form submission prevented. Page should NOT reload."); // Alert after preventDefault
+        alert("DEBUG: Form submit handler started."); 
+        e.preventDefault(); 
+        alert("DEBUG: Default form submission prevented. Page should NOT reload."); 
         
         const btn = document.getElementById('btnSave');
         btn.textContent = 'Saving...'; btn.disabled = true;
 
-        let data = {}; // Data object to send to saveRecipe
+        let data = {}; 
         try {
             data = {
                 title: document.getElementById('inpTitle').value,
@@ -1146,16 +1153,16 @@
                 ingredients: document.getElementById('inpIngredients').value.split('\n').filter(x=>x.trim()),
                 instructions: document.getElementById('inpInstructions').value.split('\n').filter(x=>x.trim()),
                 rating: parseInt(document.getElementById('inpRating').dataset.val || 0),
-                imageData: null // Will be populated in saveRecipe function
+                imageData: null 
             };
             
             const editId = document.getElementById('editId').value;
             if(editId) {
                 data.id = editId;
                 const old = recipes.find(r=>r.id===editId);
-                if(old) data.notes = old.notes; // Preserve notes if not part of form
+                if(old) data.notes = old.notes; 
             } else {
-                data.notes = ""; // New recipes start with empty notes
+                data.notes = ""; 
             }
 
             // Call the main async save function
@@ -1163,7 +1170,7 @@
             alert("DEBUG: recipeForm.onsubmit handler completed calling saveRecipe.");
 
         } catch(error) {
-            alert(`CRITICAL ERROR in form submission handler: ${error.message}.`);
+            alert(`CRITICAL ERROR in form submission handler: ${error.message}. This indicates an issue before saveRecipe itself, or in passing data.`);
             console.error("Error in form submission handler:", error);
         } finally {
             btn.textContent = "Save Recipe"; btn.disabled = false;
@@ -1239,7 +1246,7 @@
             document.getElementById('inpNewCat').value = ''; 
             alert(`DEBUG: Category "${val}" added.`);
         } else if (val) {
-            alert(`Category "${val}" already exists.`);
+            alert(`DEBUG: Category "${val}" already exists.`);
         }
     };
 

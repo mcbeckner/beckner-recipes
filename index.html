@@ -176,7 +176,7 @@
         /* --- MEAL PLAN DASHBOARD --- */
         .meal-plan-calendar {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
             gap: 10px;
         }
         .meal-day-column {
@@ -543,7 +543,7 @@
 
     // --- INIT ---
     async function init() {
-        alert("App Starting...");
+        alert("DEBUG: App Starting init()...");
         await loadGlobalData(); // Load Favorites, Meal Plan, Categories
         await loadRecipes();    // Load Recipe Data
 
@@ -557,7 +557,7 @@
         } else {
             document.getElementById('darkModeBtn').textContent = '🌙';
         }
-        alert("App Initialized. Recipes loaded.");
+        alert("DEBUG: App Initialized. Recipes loaded and UI rendered.");
     }
 
     // --- COOK MODE (WAKE LOCK) ---
@@ -565,21 +565,22 @@
         if ('wakeLock' in navigator) {
             try {
                 wakeLock = await navigator.wakeLock.request('screen');
-                alert('Screen Wake Lock active'); // Feedback
+                alert('DEBUG: Screen Wake Lock active'); // Feedback
             } catch (err) {
-                alert(`Wake Lock Error: ${err.name}, ${err.message}`); // Feedback
+                alert(`DEBUG: Wake Lock Error: ${err.name}, ${err.message}`); // Feedback
             }
         }
     }
 
     function releaseWakeLock() {
         if (wakeLock !== null && 'release' in wakeLock) {
-            wakeLock.release().then(() => { wakeLock = null; alert('Screen Wake Lock released'); }); // Feedback
+            wakeLock.release().then(() => { wakeLock = null; alert('DEBUG: Screen Wake Lock released'); }); // Feedback
         }
     }
 
     // --- DATA HANDLING ---
     async function loadGlobalData() {
+        alert("DEBUG: Loading global data (favorites, meal plan, categories)...");
         try {
             const [favSnap, planSnap, catSnap] = await Promise.all([
                 getDoc(appDataDocFavs),
@@ -590,48 +591,52 @@
             favorites = favSnap.exists() ? (favSnap.data().ids || []) : [];
             mealPlan = planSnap.exists() ? (planSnap.data().plan || {}) : {};
             categories = catSnap.exists() ? (catSnap.data().list || ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks']).sort() : ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks'].sort();
-            alert("Global data (favorites, meal plan, categories) loaded successfully.");
+            alert("DEBUG: Global data (favorites, meal plan, categories) loaded successfully.");
 
         } catch(e) { 
-            alert("Error loading global app settings (favorites, meal plan, categories). Please ensure Firestore rules allow 'read' for 'appData' collection.");
-            console.error("Global data load error:", e);
-            favorites = [];
-            mealPlan = {};
-            categories = ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks'].sort();
+            alert("ERROR: Failed to load global app settings (favorites, meal plan, categories). Please ensure Firestore rules allow 'read' for 'appData' collection.");
+            console.error("Global data load error:", e); // This will be visible if F12 was enabled
+            favorites = []; // Fallback to empty
+            mealPlan = {};  // Fallback to empty
+            categories = ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks'].sort(); // Fallback to defaults
         }
     }
 
     async function saveGlobalFavorites() {
         try {
+            alert("DEBUG: Attempting to save favorites to Cloud.");
             await setDoc(appDataDocFavs, { ids: favorites });
-            alert("Favorites saved to Cloud."); // Feedback
+            alert("DEBUG: Favorites saved to Cloud."); 
             if(document.getElementById('viewFavoritesBtn').classList.contains('active')) renderFavoritesList();
-            renderRecipeList(); // Update heart icons
-        } catch(e) { alert("Failed to save favorites to Cloud. Check Firebase Firestore rules."); console.error("Error saving favorites:", e); }
+            renderRecipeList(); 
+        } catch(e) { alert("ERROR: Failed to save favorites to Cloud. Check Firebase Firestore rules."); console.error("Error saving favorites:", e); }
     }
 
     async function saveGlobalMealPlan() {
         try {
+            alert("DEBUG: Attempting to save meal plan to Cloud.");
             await setDoc(appDataDocPlan, { plan: mealPlan });
-            alert("Meal Plan saved to Cloud."); // Feedback
+            alert("DEBUG: Meal Plan saved to Cloud."); 
             renderMealPlanGrid();
-        } catch(e) { alert("Failed to save meal plan to Cloud. Check Firebase Firestore rules."); console.error("Error saving meal plan:", e); }
+        } catch(e) { alert("ERROR: Failed to save meal plan to Cloud. Check Firebase Firestore rules."); console.error("Error saving meal plan:", e); }
     }
 
     async function saveGlobalCategories() {
         try {
+            alert("DEBUG: Attempting to save categories to Cloud.");
             await setDoc(appDataDocCats, { list: categories });
-            alert("Categories saved to Cloud."); // Feedback
+            alert("DEBUG: Categories saved to Cloud."); 
             renderCategories();
-        } catch(e) { alert("Failed to save categories to Cloud. Check Firebase Firestore rules."); console.error("Error saving categories:", e); }
+        } catch(e) { alert("ERROR: Failed to save categories to Cloud. Check Firebase Firestore rules."); console.error("Error saving categories:", e); }
     }
 
     async function loadRecipes() {
         try {
+            alert("DEBUG: Attempting to load recipes from Cloud.");
             const snap = await getDocs(recipesCollection);
             recipes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            alert(`Successfully loaded ${recipes.length} recipes from Cloud.`); // Feedback
-        } catch(e) { alert("Failed to load recipes from Cloud. Check Firebase Firestore rules."); console.error("Error loading recipes:", e); }
+            alert(`DEBUG: Successfully loaded ${recipes.length} recipes from Cloud.`); 
+        } catch(e) { alert("ERROR: Failed to load recipes from Cloud. Check Firebase Firestore rules for 'recipes' collection."); console.error("Error loading recipes:", e); }
     }
 
     // --- UI RENDERING ---
@@ -777,9 +782,9 @@
         if(!mealPlan[key].includes(recipeId)) { // Prevent duplicates
             mealPlan[key].push(recipeId);
             await saveGlobalMealPlan();
-            alert("Added to Meal Plan!"); // Feedback
+            alert("DEBUG: Added to Meal Plan!"); // Feedback
         } else {
-            alert("Recipe already on this day's plan.");
+            alert("DEBUG: Recipe already on this day's plan.");
         }
     }
 
@@ -796,24 +801,26 @@
         const recipeToDelete = recipes.find(r => r.id === id);
         
         try {
+            alert("DEBUG: Starting recipe deletion process.");
             // Attempt to delete image from storage if it exists
             if (recipeToDelete && recipeToDelete.imageData) {
                 if (recipeToDelete.imageData.startsWith('https://firebasestorage.googleapis.com/')) {
                     try {
+                        alert("DEBUG: Attempting to delete image from Storage...");
                         const oldImageRef = ref(storage, recipeToDelete.imageData);
                         await deleteObject(oldImageRef);
-                        alert("Image deleted from Storage."); // Feedback
+                        alert("DEBUG: Image deleted from Storage."); 
                     } catch (err) {
-                        // Log but don't stop the process if image deletion fails (e.g., image already gone, bad URL)
+                        alert("ERROR: Could not delete image from Storage. (May not exist or permissions). See console for more details.");
                         console.warn("Could not delete image from Storage:", err);
-                        alert("Warning: Could not delete image from Storage. (May not exist or permission issue)."); // Feedback
                     }
                 }
             }
 
             // Delete Firestore Document
+            alert("DEBUG: Attempting to delete recipe from Firestore...");
             await deleteDoc(doc(db, 'recipes', id));
-            alert("Recipe deleted from Firestore."); // Feedback
+            alert("DEBUG: Recipe deleted from Firestore."); 
 
             // Cleanup from global lists (local state only, then save)
             if(favorites.includes(id)) { favorites = favorites.filter(x => x !== id); await saveGlobalFavorites(); }
@@ -828,15 +835,17 @@
             });
             if(changed) await saveGlobalMealPlan();
 
-            await loadRecipes(); // Reload all recipes
-            showView(document.querySelector('.view-toggle button.active').id.replace('view','').toLowerCase().replace('btn','')); // Refresh current view
+            alert("DEBUG: Reloading recipes and refreshing UI after deletion.");
+            await loadRecipes(); 
+            showView(document.querySelector('.view-toggle button.active').id.replace('view','').toLowerCase().replace('btn','')); 
         } catch (e) {
-            alert(`Failed to delete recipe. Error: ${e.message || "Unknown error"}. Check Firebase Console for exact details.`);
+            alert(`ERROR: Failed to delete recipe. Error: ${e.message || "Unknown error"}. Check Firebase Console rules.`);
             console.error("Error deleting recipe:", e);
         }
     }
 
     async function saveRecipe(data) {
+        alert("DEBUG: saveRecipe function called.");
         const btn = document.getElementById('btnSave');
         btn.textContent = "Saving..."; btn.disabled = true;
         
@@ -846,33 +855,35 @@
 
             // --- IMAGE UPLOAD LOGIC ---
             if (currentImageFile) { 
-                alert("Image file detected. Attempting to upload to Storage..."); // Feedback
+                alert("DEBUG: Image file detected. Attempting to upload to Storage...");
                 const imageId = `recipe-${crypto.randomUUID()}`; 
                 const storageRef = ref(storage, `recipe_images/${imageId}`);
                 
                 try {
                     const snapshot = await uploadString(storageRef, currentImageFile, 'data_url');
                     imageUrl = await getDownloadURL(snapshot.ref);
-                    alert("Image successfully uploaded to Storage!"); // Feedback
+                    alert("DEBUG: Image successfully uploaded to Storage! URL: " + imageUrl);
                     
                     if (editId) {
                         const oldRecipe = recipes.find(r => r.id === editId);
                         if (oldRecipe && oldRecipe.imageData && oldRecipe.imageData.startsWith('https://firebasestorage.googleapis.com/')) {
                             try {
+                                alert("DEBUG: Attempting to delete old image from Storage...");
                                 const oldImageRef = ref(storage, oldRecipe.imageData);
                                 await deleteObject(oldImageRef);
-                                alert("Old image deleted from Storage."); // Feedback
+                                alert("DEBUG: Old image deleted from Storage.");
                             } catch (err) {
+                                alert("WARNING: Could not delete old image from Storage. (May not exist or permission issue).");
                                 console.warn("Could not delete old image from Storage:", err);
-                                alert("Warning: Could not delete old image from Storage. (May not exist or permission issue)."); // Feedback
                             }
                         }
                     }
                 } catch (imgError) {
-                    alert(`Image upload failed: ${imgError.message}. Check Firebase Storage rules.`); // Feedback
+                    alert(`ERROR: Image upload failed: ${imgError.message}. Check Firebase Storage rules.`); 
                     console.error("Image upload failed:", imgError);
+                    // Critical error, re-enable button and exit
                     btn.textContent = "Save Recipe"; btn.disabled = false;
-                    return; // Stop execution if image upload fails
+                    return; 
                 }
             } else if (editId) {
                 const oldRecipe = recipes.find(r => r.id === editId);
@@ -881,23 +892,28 @@
             data.imageData = imageUrl; 
 
             // --- FIRESTORE SAVE LOGIC ---
+            alert("DEBUG: Attempting to save recipe data to Firestore...");
             if(editId) {
                 await updateDoc(doc(db, 'recipes', editId), data);
-                alert("Recipe successfully updated in Firestore!"); // Feedback
+                alert("DEBUG: Recipe successfully updated in Firestore!");
             } else {
-                await addDoc(recipesCollection, data);
-                alert("New recipe successfully added to Firestore!"); // Feedback
+                const newDocRef = await addDoc(recipesCollection, data);
+                alert("DEBUG: New recipe successfully added to Firestore!");
+                data.id = newDocRef.id; // Assign the ID from Firestore to the local data object
             }
             
-            await loadRecipes(); // Reload all recipes
-            showView(document.querySelector('.view-toggle button.active').id.replace('view','').toLowerCase().replace('btn','')); // Refresh current view
+            alert("DEBUG: Reloading all recipes from Cloud and refreshing UI...");
+            await loadRecipes(); 
+            showView(document.querySelector('.view-toggle button.active').id.replace('view','').toLowerCase().replace('btn','')); 
             closeModals();
+            alert("DEBUG: Save process completed successfully!");
 
         } catch(error) {
-            alert(`Recipe save failed: ${error.message}. Check Firebase Firestore rules.`); // General Feedback
-            console.error("Error saving recipe:", error);
+            alert(`CRITICAL ERROR: Recipe save failed: ${error.message}. This could be a Firebase rule, network issue, or data problem. Check Firebase Console for exact error.`); 
+            console.error("Critical error during save process:", error);
         } finally {
             btn.textContent = "Save Recipe"; btn.disabled = false;
+            alert("DEBUG: Save button re-enabled.");
         }
     }
 
@@ -1111,7 +1127,51 @@
         document.getElementById('recipeModal').classList.add('active');
     };
 
-    // Save Form - Triggered by submit event listener earlier
+    // --- FORM SUBMISSION ---
+    document.getElementById('recipeForm').onsubmit = async (e) => {
+        alert("DEBUG: Form submit handler started."); // Alert at start of handler
+        e.preventDefault(); // THIS IS THE CRITICAL LINE TO STOP RELOAD
+        alert("DEBUG: Default form submission prevented. Page should NOT reload."); // Alert after preventDefault
+        
+        const btn = document.getElementById('btnSave');
+        btn.textContent = 'Saving...'; btn.disabled = true;
+
+        let data = {}; // Data object to send to saveRecipe
+        try {
+            data = {
+                title: document.getElementById('inpTitle').value,
+                category: document.getElementById('inpCategory').value,
+                source: document.getElementById('inpSource').value,
+                originalServings: document.getElementById('inpServings').value,
+                ingredients: document.getElementById('inpIngredients').value.split('\n').filter(x=>x.trim()),
+                instructions: document.getElementById('inpInstructions').value.split('\n').filter(x=>x.trim()),
+                rating: parseInt(document.getElementById('inpRating').dataset.val || 0),
+                imageData: null // Will be populated in saveRecipe function
+            };
+            
+            const editId = document.getElementById('editId').value;
+            if(editId) {
+                data.id = editId;
+                const old = recipes.find(r=>r.id===editId);
+                if(old) data.notes = old.notes; // Preserve notes if not part of form
+            } else {
+                data.notes = ""; // New recipes start with empty notes
+            }
+
+            // Call the main async save function
+            await saveRecipe(data); 
+            alert("DEBUG: recipeForm.onsubmit handler completed calling saveRecipe.");
+
+        } catch(error) {
+            alert(`CRITICAL ERROR in form submission handler: ${error.message}.`);
+            console.error("Error in form submission handler:", error);
+        } finally {
+            btn.textContent = "Save Recipe"; btn.disabled = false;
+            alert("DEBUG: Save button re-enabled from form submit handler.");
+        }
+    };
+
+
     // Image Upload with Resizing (Triggered by onchange event listener earlier)
     document.getElementById('inpImage').onchange = (e) => {
         const file = e.target.files[0];
@@ -1129,13 +1189,13 @@
                 const reader = new FileReader();
                 reader.onloadend = () => {
                     currentImageFile = reader.result; 
-                    alert(`Image compressed to ${ (currentImageFile.length / 1024).toFixed(1) } KB. Ready for upload.`);
+                    alert(`DEBUG: Image compressed to ${ (currentImageFile.length / 1024).toFixed(1) } KB. Ready for upload.`);
                 };
                 reader.readAsDataURL(result);
             },
             error(err) {
                 console.error("Image compression error:", err.message);
-                alert("Image compression failed. Please try a different image or smaller file size.");
+                alert("ERROR: Image compression failed. Please try a different image or smaller file size.");
                 currentImageFile = null;
             },
         });
@@ -1155,12 +1215,13 @@
     document.getElementById('detNotes').onchange = async (e) => {
         if(activeRecipeId) {
             try {
+                alert("DEBUG: Attempting to save notes to Firestore.");
                 await updateDoc(doc(db, 'recipes', activeRecipeId), { notes: e.target.value });
                 recipes.find(x=>x.id===activeRecipeId).notes = e.target.value;
-                alert("Notes saved successfully.");
+                alert("DEBUG: Notes saved successfully.");
             } catch(error) {
                 console.error("Failed to save notes:", error);
-                alert("Failed to save notes. Check Firebase rules.");
+                alert("ERROR: Failed to save notes. Check Firebase rules.");
             }
         }
     };
@@ -1176,7 +1237,7 @@
             await saveGlobalCategories(); 
             document.getElementById('inpCategory').value = val; 
             document.getElementById('inpNewCat').value = ''; 
-            alert(`Category "${val}" added.`);
+            alert(`DEBUG: Category "${val}" added.`);
         } else if (val) {
             alert(`Category "${val}" already exists.`);
         }
@@ -1188,7 +1249,7 @@
         if(day && activeRecipeId) {
             await addToMealPlanFromDetail(day, activeRecipeId);
         } else {
-            alert("Please select a day to add to meal plan.");
+            alert("DEBUG: Please select a day to add to meal plan.");
         }
     };
 
@@ -1216,14 +1277,15 @@
             const v = parseInt(e.target.dataset.v);
             updateStars(document.getElementById('detRating'), v);
             try {
+                alert("DEBUG: Attempting to update rating in Firestore.");
                 await updateDoc(doc(db, 'recipes', activeRecipeId), { rating: parseInt(v) });
                 const r = recipes.find(x=>x.id===activeRecipeId);
                 if(r) r.rating = parseInt(v); 
                 renderRecipeList();
-                alert("Rating updated successfully.");
+                alert("DEBUG: Rating updated successfully.");
             } catch(error) {
                 console.error("Failed to update rating:", error);
-                alert("Failed to update rating. Check Firebase rules.");
+                alert("ERROR: Failed to update rating. Check Firebase rules.");
             }
         }
     }

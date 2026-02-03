@@ -219,21 +219,6 @@
             background-color: var(--button-primary-hover);
         }
 
-        .top-buttons #exportJsonBtn,
-        .top-buttons #importJsonBtn {
-            background-color: var(--button-info);
-        }
-        .top-buttons #exportJsonBtn:hover,
-        .top-buttons #importJsonBtn:hover {
-            background-color: var(--button-info-hover);
-        }
-        .top-buttons #clearAndImportJsonBtn {
-            background-color: var(--button-danger);
-        }
-        .top-buttons #clearAndImportJsonBtn:hover {
-            background-color: var(--button-danger-hover);
-        }
-
         #controls {
             display: flex;
             justify-content: space-between;
@@ -371,10 +356,6 @@
             color: var(--text-color);
             margin-top: 30px;
             font-size: 1.1em;
-        }
-
-        #importFileInput {
-            display: none;
         }
 
         /* --- Modal Styles --- */
@@ -899,10 +880,6 @@
 
         <!-- Top Buttons -->
         <div class="top-buttons">
-            <button id="exportJsonBtn">Export All Recipes (JSON)</button>
-            <button id="importJsonBtn">Merge with JSON</button>
-            <button id="clearAndImportJsonBtn">Clear All & Import JSON</button>
-            <input type="file" id="importFileInput" accept=".json">
             <button class="primary-btn" id="openAddRecipeModalBtn">Add New Recipe</button>
         </div>
 
@@ -979,11 +956,10 @@
                     <input type="text" id="recipeTitle" required>
                 </div>
                 <div class="form-group">
-                    <label for="recipeImageFile">Upload Image (JPG/PNG - Max ~200KB for localStorage):</label>
+                    <label for="recipeImageFile">Upload Image (Max ~1MB):</label>
                     <input type="file" id="recipeImageFile" accept="image/jpeg, image/png">
                     <p class="image-upload-warning">
-                        <strong>Warning:</strong> Images are stored as base64 strings. Large images (over 1MB) can impact performance.
-                        Consider optimizing image sizes before upload.
+                        Images stored in the Cloud. Keep file sizes reasonable (under 1MB).
                     </p>
                 </div>
                 
@@ -1008,7 +984,7 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="ingredients">Ingredients (one item per line for best scaling results):</label>
+                    <label for="ingredients">Ingredients (one item per line):</label>
                     <textarea id="ingredients" rows="6" required></textarea>
                 </div>
                 <div class="form-group">
@@ -1055,7 +1031,7 @@
                 <input type="number" id="desiredServings" min="1" value="1">
             </div>
             <p class="scaling-warning">
-                <strong>Scaling Warning:</strong> Ingredient scaling is basic and works best for simple numerical quantities (e.g., "2 cups"). It may not accurately scale complex descriptions.
+                <strong>Scaling Warning:</strong> Ingredient scaling is basic and works best for simple numerical quantities.
             </p>
 
             <div id="recipeDetailModalContent">
@@ -1064,7 +1040,7 @@
 
             <div class="detail-section recipe-notes-section">
                 <h3>Your Notes</h3>
-                <textarea id="recipeNotes" placeholder="Add your personal notes, tips, or modifications here..."></textarea>
+                <textarea id="recipeNotes" placeholder="Add your personal notes..."></textarea>
             </div>
 
             <button class="edit-recipe-btn" id="editRecipeBtn">Edit Recipe</button>
@@ -1072,14 +1048,11 @@
         </div>
     </div>
 
-    <!-- ONE SINGLE SCRIPT BLOCK - MODULE TYPE FOR FIREBASE -->
-      <!-- REPLACE THE BOTTOM SCRIPT TAG WITH THIS -->
+    <!-- MAIN APP SCRIPT -->
     <script type="module">
-        // --- 1. FIREBASE INITIALIZATION ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // Your Config
         const firebaseConfig = {
             apiKey: "AIzaSyA_5czSGHpYR8ZHMuB41mnIf5gL8zvLS6M",
             authDomain: "becknerrecipes.firebaseapp.com",
@@ -1090,25 +1063,23 @@
             measurementId: "G-SEC7ENVK7Y"
         };
 
-        // Initialize
-        console.log("Initializing Firebase...");
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const recipesCollection = collection(db, 'recipes');
 
-        // --- 2. STATE & DOM ---
+        // --- STATE ---
         let allRecipes = []; 
         let currentRecipeImageData = null;
         let activeRecipeId = null;
+        let currentTimer = null;
         let currentView = 'recipes';
         
-        // Local Storage Keys (for non-synced settings)
+        // Local Storage for User Specific Settings
         const CATEGORIES_STORAGE_KEY = 'becknerCategories';
         const FAVORITES_STORAGE_KEY = 'becknerFavorites';
         const MEAL_PLAN_STORAGE_KEY = 'becknerMealPlan';
         const DARK_MODE_KEY = 'becknerDarkMode';
 
-        // Load Local Settings
         function loadData(key, def) { const j = localStorage.getItem(key); return j ? JSON.parse(j) : def; }
         function saveData(key, d) { localStorage.setItem(key, JSON.stringify(d)); }
 
@@ -1117,226 +1088,484 @@
         let favorites = loadData(FAVORITES_STORAGE_KEY, []);
         let mealPlan = loadData(MEAL_PLAN_STORAGE_KEY, {});
 
-        // DOM Elements
+        // --- DOM ---
         const recipeListDiv = document.getElementById('recipeList');
         const emptyMessage = document.getElementById('emptyMessage');
-        const recipeForm = document.getElementById('recipeForm');
-        const recipeTitleInput = document.getElementById('recipeTitle');
-        const recipeCategorySelect = document.getElementById('recipeCategory');
-        const originalServingsInput = document.getElementById('originalServings');
-        const ingredientsInput = document.getElementById('ingredients');
-        const instructionsInput = document.getElementById('instructions');
-        const recipeImageFile = document.getElementById('recipeImageFile');
-        const addRecipeRatingStars = document.getElementById('addRecipeRatingStars');
-        const editingRecipeIdInput = document.getElementById('editingRecipeId');
+        const favoritesList = document.getElementById('favoritesList');
+        const emptyFavoritesMessage = document.getElementById('emptyFavoritesMessage');
+        const mealPlanCalendar = document.getElementById('mealPlanCalendar');
         
-        // Modals
-        const addRecipeModalOverlay = document.getElementById('addRecipeModalOverlay');
-        const openAddRecipeModalBtn = document.getElementById('openAddRecipeModalBtn');
-        const closeAddRecipeModalBtn = document.getElementById('closeAddRecipeModalBtn');
-        const recipeDetailModalOverlay = document.getElementById('recipeDetailModalOverlay');
-        const closeRecipeDetailModalBtn = document.getElementById('closeRecipeDetailModalBtn');
-        const recipeDetailModalContent = document.getElementById('recipeDetailModalContent');
-        const detailRecipeTitle = document.getElementById('detailRecipeTitle');
-        const detailRecipeCategory = document.getElementById('detailRecipeCategory');
-        const detailRecipeRating = document.getElementById('detailRecipeRating');
-        const detailOriginalServings = document.getElementById('detailOriginalServings');
-        const desiredServingsInput = document.getElementById('desiredServings');
-        const recipeNotesTextarea = document.getElementById('recipeNotes');
+        // --- FIRESTORE ---
 
-        // --- 3. CORE FUNCTIONS ---
-
-        // LOAD
         async function loadRecipesFromFirestore() {
-            console.log("Loading recipes from Cloud...");
             try {
                 const snapshot = await getDocs(recipesCollection);
                 allRecipes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                console.log("Recipes loaded:", allRecipes.length);
-                renderRecipes();
+                // Refresh current view
+                if(currentView === 'recipes') renderRecipes();
+                else if(currentView === 'favorites') renderFavorites();
+                else if(currentView === 'mealPlan') renderMealPlan();
             } catch (error) {
-                console.error("Error loading recipes:", error);
-                alert("Error loading recipes. See console for details.");
+                console.error("Error loading:", error);
             }
         }
 
-        // SAVE
         async function saveRecipeToFirestore(recipe) {
-            console.log("Attempting to save...", recipe);
             try {
                 if (recipe.id) {
-                    const docRef = doc(db, 'recipes', recipe.id);
-                    await updateDoc(docRef, recipe);
-                    console.log("Updated doc ID:", recipe.id);
+                    await updateDoc(doc(db, 'recipes', recipe.id), recipe);
                 } else {
-                    const docRef = await addDoc(recipesCollection, recipe);
-                    console.log("Created new doc ID:", docRef.id);
+                    await addDoc(recipesCollection, recipe);
                 }
-                await loadRecipesFromFirestore(); // Refresh local list
+                await loadRecipesFromFirestore();
                 return true;
             } catch (error) {
-                console.error("Error saving recipe:", error);
-                alert("Failed to save. Check internet or permissions.");
+                console.error("Save failed:", error);
                 return false;
             }
         }
 
-        // DELETE
         async function deleteRecipeFromFirestore(id) {
-            if(!confirm("Delete this recipe?")) return;
             try {
                 await deleteDoc(doc(db, 'recipes', id));
+                // Clean up local refs
+                if(favorites.includes(id)) {
+                    favorites = favorites.filter(fid => fid !== id);
+                    saveData(FAVORITES_STORAGE_KEY, favorites);
+                }
+                // Clean meal plan
+                Object.keys(mealPlan).forEach(key => {
+                    mealPlan[key] = mealPlan[key].filter(mid => mid !== id);
+                    if(mealPlan[key].length === 0) delete mealPlan[key];
+                });
+                saveData(MEAL_PLAN_STORAGE_KEY, mealPlan);
+                
                 await loadRecipesFromFirestore();
             } catch (error) {
                 console.error("Delete failed:", error);
             }
         }
 
-        // --- 4. RENDER UI ---
+        // --- RENDERERS ---
 
         function renderRecipes() {
             recipeListDiv.innerHTML = '';
+            let list = [...allRecipes];
+
+            // Search
+            const term = document.getElementById('recipeSearchInput').value.toLowerCase();
+            if (term) {
+                list = list.filter(r => 
+                    (r.title && r.title.toLowerCase().includes(term)) ||
+                    (r.category && r.category.toLowerCase().includes(term)) ||
+                    (r.ingredients && r.ingredients.some(i => i.toLowerCase().includes(term)))
+                );
+            }
+            // Filter
+            const cat = document.getElementById('filterCategorySelect').value;
+            if (cat !== 'all') list = list.filter(r => r.category === cat);
             
-            if (allRecipes.length === 0) {
+            // Sort
+            const sortBy = document.getElementById('sortSelect').value;
+            if (sortBy === 'titleAsc') list.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+            else if (sortBy === 'titleDesc') list.sort((a, b) => (b.title || '').localeCompare(a.title || ''));
+            else if (sortBy === 'favorites') list.sort((a, b) => {
+                const aFav = favorites.includes(a.id);
+                const bFav = favorites.includes(b.id);
+                return bFav - aFav;
+            });
+
+            if (list.length === 0) {
                 emptyMessage.style.display = 'block';
-                return;
             } else {
                 emptyMessage.style.display = 'none';
+                list.forEach(recipe => createRecipeCard(recipe, recipeListDiv));
             }
+        }
 
-            allRecipes.forEach(recipe => {
-                const el = document.createElement('div');
-                el.className = 'recipe-item';
-                el.dataset.recipeId = recipe.id;
-                const isFav = favorites.includes(recipe.id);
+        function renderFavorites() {
+            favoritesList.innerHTML = '';
+            const list = allRecipes.filter(r => favorites.includes(r.id));
+            if(list.length === 0) {
+                emptyFavoritesMessage.style.display = 'block';
+            } else {
+                emptyFavoritesMessage.style.display = 'none';
+                list.forEach(recipe => createRecipeCard(recipe, favoritesList));
+            }
+        }
+
+        function createRecipeCard(recipe, container) {
+            const el = document.createElement('div');
+            el.className = 'recipe-item';
+            el.dataset.id = recipe.id;
+            const isFav = favorites.includes(recipe.id);
+            
+            el.innerHTML = `
+                ${recipe.imageData ? `<img src="${recipe.imageData}">` : '<div style="height:180px; background:#ddd; display:flex; align-items:center; justify-content:center;">No Image</div>'}
+                <button class="favorite-btn ${isFav ? 'favorited' : ''}">
+                    ${isFav ? '❤️' : '🤍'}
+                </button>
+                <h3>${recipe.title}</h3>
+                <button class="delete-btn">&times;</button>
+            `;
+
+            // Card Clicks
+            el.querySelector('.delete-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                if(confirm(`Delete ${recipe.title}?`)) deleteRecipeFromFirestore(recipe.id);
+            });
+            el.querySelector('.favorite-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleFavorite(recipe.id, e.target);
+            });
+            el.addEventListener('click', () => openRecipeDetail(recipe.id));
+            
+            container.appendChild(el);
+        }
+
+        function toggleFavorite(id, btn) {
+            if (favorites.includes(id)) {
+                favorites = favorites.filter(fid => fid !== id);
+                btn.textContent = '🤍';
+                btn.classList.remove('favorited');
+            } else {
+                favorites.push(id);
+                btn.textContent = '❤️';
+                btn.classList.add('favorited');
+            }
+            saveData(FAVORITES_STORAGE_KEY, favorites);
+            if(currentView === 'favorites') renderFavorites();
+        }
+
+        function renderMealPlan() {
+            mealPlanCalendar.innerHTML = '';
+            const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+            const week = document.getElementById('mealPlanWeekSelect').value;
+
+            days.forEach(day => {
+                const dayKey = `${week}-${day.toLowerCase()}`;
+                const col = document.createElement('div');
+                col.className = 'meal-plan-day';
+                col.innerHTML = `<div class="meal-plan-day-header">${day}</div>`;
                 
-                el.innerHTML = `
-                    ${recipe.imageData ? `<img src="${recipe.imageData}">` : '<div style="height:180px; background:#ddd; display:flex; align-items:center; justify-content:center;">No Image</div>'}
-                    <h3>${recipe.title}</h3>
-                    <button class="delete-btn" data-id="${recipe.id}">&times;</button>
-                `;
-                
-                // Click Event
-                el.addEventListener('click', (e) => {
-                    if (e.target.classList.contains('delete-btn')) {
-                        e.stopPropagation();
-                        deleteRecipeFromFirestore(recipe.id);
-                    } else {
-                        openRecipeDetail(recipe.id);
+                const mealIds = mealPlan[dayKey] || [];
+                mealIds.forEach(id => {
+                    const r = allRecipes.find(rec => rec.id === id);
+                    if(r) {
+                        const item = document.createElement('div');
+                        item.className = 'meal-plan-recipe';
+                        item.innerHTML = `
+                            <span class="meal-plan-recipe-link">${r.title}</span>
+                            <button class="remove-meal">&times;</button>
+                        `;
+                        item.querySelector('.remove-meal').addEventListener('click', () => {
+                            mealPlan[dayKey] = mealPlan[dayKey].filter(mid => mid !== id);
+                            if(mealPlan[dayKey].length === 0) delete mealPlan[dayKey];
+                            saveData(MEAL_PLAN_STORAGE_KEY, mealPlan);
+                            renderMealPlan();
+                        });
+                        item.querySelector('.meal-plan-recipe-link').addEventListener('click', () => openRecipeDetail(id));
+                        col.appendChild(item);
                     }
                 });
-
-                recipeListDiv.appendChild(el);
+                mealPlanCalendar.appendChild(col);
             });
         }
 
+        // --- DETAIL VIEW & LOGIC ---
+
+        const desiredServingsInput = document.getElementById('desiredServings');
+        
         function openRecipeDetail(id) {
             const recipe = allRecipes.find(r => r.id === id);
             if (!recipe) return;
             activeRecipeId = id;
             
-            detailRecipeTitle.textContent = recipe.title;
-            detailRecipeCategory.textContent = recipe.category;
-            detailOriginalServings.textContent = recipe.originalServings;
+            document.getElementById('detailRecipeTitle').textContent = recipe.title;
+            document.getElementById('detailRecipeCategory').textContent = recipe.category;
+            document.getElementById('detailOriginalServings').textContent = recipe.originalServings;
             desiredServingsInput.value = recipe.originalServings;
-            recipeNotesTextarea.value = recipe.notes || '';
+            document.getElementById('recipeNotes').value = recipe.notes || '';
             
-            recipeDetailModalContent.innerHTML = ''; // Clear previous
+            // Render Rating
+            renderStars(document.getElementById('detailRecipeRating'), recipe.rating || 0);
 
-            // Ingredients
-            const ingHeader = document.createElement('h3'); ingHeader.textContent = "Ingredients";
-            recipeDetailModalContent.appendChild(ingHeader);
-            const ul = document.createElement('ul');
-            recipe.ingredients.forEach(ing => {
-                const li = document.createElement('li');
-                li.textContent = ing;
-                ul.appendChild(li);
-            });
-            recipeDetailModalContent.appendChild(ul);
-
+            // Initial Ingredient Render
+            updateScaledIngredients(recipe);
+            
             // Instructions
-            const instHeader = document.createElement('h3'); instHeader.textContent = "Instructions";
-            recipeDetailModalContent.appendChild(instHeader);
+            const content = document.getElementById('recipeDetailModalContent');
             const ol = document.createElement('ol');
+            content.querySelector('.instructions-section')?.remove(); // Cleanup old
+            const sec = document.createElement('div');
+            sec.className = 'detail-section instructions-section';
+            sec.innerHTML = '<h3>Instructions</h3>';
+            
             recipe.instructions.forEach(inst => {
                 const li = document.createElement('li');
                 li.textContent = inst;
+                // Simple Timer check
+                const match = inst.match(/(\d+)\s*(min|minute)/i);
+                if(match) {
+                    const btn = document.createElement('button');
+                    btn.className = 'timer-btn';
+                    btn.textContent = `Start ${match[1]}m Timer`;
+                    btn.onclick = () => startTimer(parseInt(match[1]), inst);
+                    li.appendChild(btn);
+                }
                 ol.appendChild(li);
             });
-            recipeDetailModalContent.appendChild(ol);
+            sec.appendChild(ol);
+            content.appendChild(sec);
 
-            addRecipeModalOverlay.classList.remove('active'); // Ensure add modal is closed
-            recipeDetailModalOverlay.classList.add('active');
+            document.getElementById('recipeDetailModalOverlay').classList.add('active');
         }
 
-        // --- 5. EVENT LISTENERS ---
+        // Ingredient Scaling Logic
+        function updateScaledIngredients(recipe) {
+            const content = document.getElementById('recipeDetailModalContent');
+            content.querySelector('.ingredients-section')?.remove(); // Cleanup old
+            
+            const desired = parseFloat(desiredServingsInput.value) || 1;
+            const original = parseFloat(recipe.originalServings) || 1;
+            const ratio = desired / original;
 
-        // Category Dropdown
-        function renderCategoryDropdowns() {
-            recipeCategorySelect.innerHTML = '';
-            allCategories.forEach(cat => {
-                const op = document.createElement('option');
-                op.value = cat; op.textContent = cat;
-                recipeCategorySelect.appendChild(op);
+            const sec = document.createElement('div');
+            sec.className = 'detail-section ingredients-section';
+            sec.innerHTML = '<h3>Ingredients</h3>';
+            const ul = document.createElement('ul');
+
+            recipe.ingredients.forEach(ing => {
+                const li = document.createElement('li');
+                li.className = 'ingredient-item';
+                li.onclick = () => li.classList.toggle('checked');
+                
+                // Regex for number at start
+                const match = ing.match(/^(\d+(\.\d+)?|\d+\/\d+)\s*(.*)/);
+                if(match) {
+                    let qty = match[1];
+                    let rest = match[3];
+                    if(qty.includes('/')) {
+                        const [n,d] = qty.split('/');
+                        qty = parseInt(n)/parseInt(d);
+                    } else {
+                        qty = parseFloat(qty);
+                    }
+                    const newQty = (qty * ratio).toFixed(2).replace(/\.00$/, '');
+                    li.textContent = `${newQty} ${rest}`;
+                } else {
+                    li.textContent = ing;
+                }
+                ul.appendChild(li);
+            });
+            sec.appendChild(ul);
+            content.prepend(sec);
+        }
+
+        // Listen for Servings Change
+        desiredServingsInput.addEventListener('input', () => {
+             const r = allRecipes.find(x => x.id === activeRecipeId);
+             if(r) updateScaledIngredients(r);
+        });
+
+        // Add to Meal Plan Button (In Modal)
+        document.getElementById('addToMealPlanBtn').addEventListener('click', () => {
+            const day = document.getElementById('addToMealPlanDay').value;
+            if(!day || !activeRecipeId) return;
+            const key = `current-${day}`;
+            if(!mealPlan[key]) mealPlan[key] = [];
+            mealPlan[key].push(activeRecipeId);
+            saveData(MEAL_PLAN_STORAGE_KEY, mealPlan);
+            alert("Added to Meal Plan");
+        });
+
+        // Save Notes on Change
+        document.getElementById('recipeNotes').addEventListener('change', async (e) => {
+             if(activeRecipeId) {
+                 await updateDoc(doc(db, 'recipes', activeRecipeId), { notes: e.target.value });
+                 const r = allRecipes.find(x => x.id === activeRecipeId);
+                 if(r) r.notes = e.target.value;
+             }
+        });
+        
+        // Stars Logic
+        function renderStars(container, rating) {
+            container.dataset.rating = rating;
+            Array.from(container.children).forEach(star => {
+                star.classList.toggle('filled', parseInt(star.dataset.value) <= rating);
             });
         }
+        
+        // Setup Stars Click
+        [document.getElementById('addRecipeRatingStars'), document.getElementById('detailRecipeRating')].forEach(container => {
+             Array.from(container.children).forEach(star => {
+                star.addEventListener('click', async () => {
+                    const val = parseInt(star.dataset.value);
+                    renderStars(container, val);
+                    // If in detail view, save immediately
+                    if(container.id === 'detailRecipeRating' && activeRecipeId) {
+                         await updateDoc(doc(db, 'recipes', activeRecipeId), { rating: val });
+                         const r = allRecipes.find(x => x.id === activeRecipeId);
+                         if(r) r.rating = val;
+                         if(currentView === 'recipes') renderRecipes(); // Refresh list to show sort changes
+                    }
+                });
+             });
+        });
 
-        // Form Submit
-        recipeForm.addEventListener('submit', async (e) => {
+        // --- GENERAL EVENT LISTENERS ---
+
+        // View Tabs
+        document.getElementById('recipesViewBtn').addEventListener('click', () => switchView('recipes'));
+        document.getElementById('mealPlanViewBtn').addEventListener('click', () => switchView('mealPlan'));
+        document.getElementById('favoritesViewBtn').addEventListener('click', () => switchView('favorites'));
+
+        function switchView(view) {
+            currentView = view;
+            document.querySelectorAll('.view-toggle button').forEach(b => b.classList.remove('active'));
+            document.getElementById(`${view}ViewBtn`).classList.add('active');
+            
+            document.getElementById('view-recipes-section').style.display = view === 'recipes' ? 'block' : 'none';
+            document.getElementById('meal-plan-section').style.display = view === 'mealPlan' ? 'block' : 'none';
+            document.getElementById('favorites-section').style.display = view === 'favorites' ? 'block' : 'none';
+
+            if(view === 'recipes') renderRecipes();
+            if(view === 'favorites') renderFavorites();
+            if(view === 'mealPlan') renderMealPlan();
+        }
+
+        // Add Modal
+        document.getElementById('openAddRecipeModalBtn').addEventListener('click', () => {
+            document.getElementById('recipeForm').reset();
+            currentRecipeImageData = null;
+            renderStars(document.getElementById('addRecipeRatingStars'), 0);
+            document.getElementById('addRecipeModalOverlay').classList.add('active');
+        });
+        
+        // Close Modals
+        document.querySelectorAll('.modal-close-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.target.closest('.modal-overlay').classList.remove('active');
+            });
+        });
+
+        // Edit Recipe
+        document.getElementById('editRecipeBtn').addEventListener('click', () => {
+            const r = allRecipes.find(x => x.id === activeRecipeId);
+            if(!r) return;
+            document.getElementById('recipeDetailModalOverlay').classList.remove('active');
+            
+            const form = document.getElementById('recipeForm');
+            document.getElementById('editingRecipeId').value = r.id;
+            document.getElementById('recipeTitle').value = r.title;
+            document.getElementById('recipeCategory').value = r.category;
+            document.getElementById('originalServings').value = r.originalServings;
+            document.getElementById('ingredients').value = r.ingredients.join('\n');
+            document.getElementById('instructions').value = r.instructions.join('\n');
+            renderStars(document.getElementById('addRecipeRatingStars'), r.rating || 0);
+            currentRecipeImageData = r.imageData;
+            
+            document.getElementById('addRecipeModalOverlay').classList.add('active');
+        });
+
+        // Save Form
+        document.getElementById('recipeForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const submitBtn = document.getElementById('saveRecipeBtn');
-            submitBtn.textContent = "Saving...";
-            submitBtn.disabled = true;
+            const btn = document.getElementById('saveRecipeBtn');
+            btn.textContent = 'Saving...';
+            btn.disabled = true;
 
-            const recipeData = {
-                title: recipeTitleInput.value,
-                category: recipeCategorySelect.value,
-                originalServings: parseInt(originalServingsInput.value),
-                rating: parseInt(addRecipeRatingStars.dataset.rating || 0),
-                ingredients: ingredientsInput.value.split('\n').filter(s => s.trim()),
-                instructions: instructionsInput.value.split('\n').filter(s => s.trim()),
+            const data = {
+                title: document.getElementById('recipeTitle').value,
+                category: document.getElementById('recipeCategory').value,
+                originalServings: parseInt(document.getElementById('originalServings').value),
+                ingredients: document.getElementById('ingredients').value.split('\n').filter(s=>s.trim()),
+                instructions: document.getElementById('instructions').value.split('\n').filter(s=>s.trim()),
+                rating: parseInt(document.getElementById('addRecipeRatingStars').dataset.rating || 0),
                 imageData: currentRecipeImageData,
                 notes: ''
             };
-
-            if(editingRecipeIdInput.value) recipeData.id = editingRecipeIdInput.value;
-
-            if(await saveRecipeToFirestore(recipeData)) {
-                closeModal(addRecipeModalOverlay);
-                recipeForm.reset();
-                currentRecipeImageData = null;
+            
+            const editId = document.getElementById('editingRecipeId').value;
+            if(editId) {
+                data.id = editId;
+                // Preserve notes/image if not changed
+                const old = allRecipes.find(x=>x.id===editId);
+                if(old) {
+                    data.notes = old.notes;
+                    if(!data.imageData) data.imageData = old.imageData;
+                }
             }
-            submitBtn.textContent = "Save Recipe";
-            submitBtn.disabled = false;
+
+            if(await saveRecipeToFirestore(data)) {
+                document.getElementById('addRecipeModalOverlay').classList.remove('active');
+            }
+            btn.textContent = 'Save Recipe';
+            btn.disabled = false;
         });
 
         // Image Reader
-        recipeImageFile.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (evt) => currentRecipeImageData = evt.target.result;
-            reader.readAsDataURL(file);
+        document.getElementById('recipeImageFile').addEventListener('change', (e) => {
+             const file = e.target.files[0];
+             if(file) {
+                 const reader = new FileReader();
+                 reader.onload = (evt) => currentRecipeImageData = evt.target.result;
+                 reader.readAsDataURL(file);
+             }
         });
+        
+        // Search & Filter Listeners
+        document.getElementById('recipeSearchInput').addEventListener('input', renderRecipes);
+        document.getElementById('filterCategorySelect').addEventListener('change', renderRecipes);
+        document.getElementById('sortSelect').addEventListener('change', renderRecipes);
 
-        // Modal Controls
-        openAddRecipeModalBtn.addEventListener('click', () => {
-            recipeForm.reset();
-            currentRecipeImageData = null;
-            editingRecipeIdInput.value = '';
-            addRecipeModalOverlay.classList.add('active');
-        });
-        closeAddRecipeModalBtn.addEventListener('click', () => closeModal(addRecipeModalOverlay));
-        closeRecipeDetailModalBtn.addEventListener('click', () => closeModal(recipeDetailModalOverlay));
-
-        function closeModal(modal) {
-            modal.classList.remove('active');
+        // Timer
+        function startTimer(min, txt) {
+            let sec = min * 60;
+            const ind = document.getElementById('timerIndicator');
+            ind.style.display = 'block';
+            
+            if(currentTimer) clearInterval(currentTimer);
+            
+            currentTimer = setInterval(() => {
+                sec--;
+                const m = Math.floor(sec/60);
+                const s = sec%60;
+                ind.textContent = `Timer (${txt.substring(0,15)}...): ${m}:${s.toString().padStart(2,'0')}`;
+                if(sec <= 0) {
+                    clearInterval(currentTimer);
+                    ind.style.display = 'none';
+                    alert("Timer Done!");
+                }
+            }, 1000);
         }
 
-        // --- 6. STARTUP ---
-        console.log("App starting...");
-        renderCategoryDropdowns();
-        loadRecipesFromFirestore(); // This triggers the initial fetch
+        // --- INIT ---
+        console.log("App Started");
+        
+        // Render Categories
+        const catSelect = document.getElementById('recipeCategory');
+        const filterSelect = document.getElementById('filterCategorySelect');
+        function renderCats() {
+            catSelect.innerHTML = '';
+            allCategories.forEach(c => catSelect.add(new Option(c, c)));
+            filterSelect.innerHTML = '<option value="all">All Categories</option>';
+            allCategories.forEach(c => filterSelect.add(new Option(c, c)));
+        }
+        renderCats();
+
+        // Add Category
+        document.getElementById('addNewCategoryBtn').addEventListener('click', () => {
+            const val = document.getElementById('newCategoryName').value.trim();
+            if(val && !allCategories.includes(val)) {
+                allCategories.push(val);
+                saveData(CATEGORIES_STORAGE_KEY, allCategories.sort());
+                renderCats();
+                catSelect.value = val;
+            }
+        });
+
+        loadRecipesFromFirestore();
 
     </script>
 </body>

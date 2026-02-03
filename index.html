@@ -543,7 +543,7 @@
 
     // --- INIT ---
     async function init() {
-        console.log("Initializing Beckner Recipes App...");
+        alert("App Starting...");
         await loadGlobalData(); // Load Favorites, Meal Plan, Categories
         await loadRecipes();    // Load Recipe Data
 
@@ -557,6 +557,7 @@
         } else {
             document.getElementById('darkModeBtn').textContent = '🌙';
         }
+        alert("App Initialized. Recipes loaded.");
     }
 
     // --- COOK MODE (WAKE LOCK) ---
@@ -564,19 +565,16 @@
         if ('wakeLock' in navigator) {
             try {
                 wakeLock = await navigator.wakeLock.request('screen');
-                console.log('Screen Wake Lock active');
-                wakeLock.addEventListener('release', () => {
-                    console.log('Screen Wake Lock released');
-                });
+                alert('Screen Wake Lock active'); // Feedback
             } catch (err) {
-                console.log(`Wake Lock Error: ${err.name}, ${err.message}`);
+                alert(`Wake Lock Error: ${err.name}, ${err.message}`); // Feedback
             }
         }
     }
 
     function releaseWakeLock() {
         if (wakeLock !== null && 'release' in wakeLock) {
-            wakeLock.release().then(() => { wakeLock = null; console.log('Screen Wake Lock released'); });
+            wakeLock.release().then(() => { wakeLock = null; alert('Screen Wake Lock released'); }); // Feedback
         }
     }
 
@@ -592,10 +590,11 @@
             favorites = favSnap.exists() ? (favSnap.data().ids || []) : [];
             mealPlan = planSnap.exists() ? (planSnap.data().plan || {}) : {};
             categories = catSnap.exists() ? (catSnap.data().list || ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks']).sort() : ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks'].sort();
+            alert("Global data (favorites, meal plan, categories) loaded successfully.");
 
         } catch(e) { 
-            alert("Error loading global app settings (favorites, meal plan, categories). Please check Firebase Console for details.");
-            console.error("Global data load error. Possibly first run or network issue.", e);
+            alert("Error loading global app settings (favorites, meal plan, categories). Please ensure Firestore rules allow 'read' for 'appData' collection.");
+            console.error("Global data load error:", e);
             favorites = [];
             mealPlan = {};
             categories = ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks'].sort();
@@ -605,30 +604,34 @@
     async function saveGlobalFavorites() {
         try {
             await setDoc(appDataDocFavs, { ids: favorites });
+            alert("Favorites saved to Cloud."); // Feedback
             if(document.getElementById('viewFavoritesBtn').classList.contains('active')) renderFavoritesList();
             renderRecipeList(); // Update heart icons
-        } catch(e) { alert("Failed to save favorites. Check Firebase rules."); console.error("Error saving favorites:", e); }
+        } catch(e) { alert("Failed to save favorites to Cloud. Check Firebase Firestore rules."); console.error("Error saving favorites:", e); }
     }
 
     async function saveGlobalMealPlan() {
         try {
             await setDoc(appDataDocPlan, { plan: mealPlan });
+            alert("Meal Plan saved to Cloud."); // Feedback
             renderMealPlanGrid();
-        } catch(e) { alert("Failed to save meal plan. Check Firebase rules."); console.error("Error saving meal plan:", e); }
+        } catch(e) { alert("Failed to save meal plan to Cloud. Check Firebase Firestore rules."); console.error("Error saving meal plan:", e); }
     }
 
     async function saveGlobalCategories() {
         try {
             await setDoc(appDataDocCats, { list: categories });
+            alert("Categories saved to Cloud."); // Feedback
             renderCategories();
-        } catch(e) { alert("Failed to save categories. Check Firebase rules."); console.error("Error saving categories:", e); }
+        } catch(e) { alert("Failed to save categories to Cloud. Check Firebase Firestore rules."); console.error("Error saving categories:", e); }
     }
 
     async function loadRecipes() {
         try {
             const snap = await getDocs(recipesCollection);
             recipes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        } catch(e) { alert("Failed to load recipes. Check Firebase rules."); console.error("Error loading recipes:", e); }
+            alert(`Successfully loaded ${recipes.length} recipes from Cloud.`); // Feedback
+        } catch(e) { alert("Failed to load recipes from Cloud. Check Firebase Firestore rules."); console.error("Error loading recipes:", e); }
     }
 
     // --- UI RENDERING ---
@@ -774,7 +777,7 @@
         if(!mealPlan[key].includes(recipeId)) { // Prevent duplicates
             mealPlan[key].push(recipeId);
             await saveGlobalMealPlan();
-            alert("Added to Meal Plan!");
+            alert("Added to Meal Plan!"); // Feedback
         } else {
             alert("Recipe already on this day's plan.");
         }
@@ -795,17 +798,15 @@
         try {
             // Attempt to delete image from storage if it exists
             if (recipeToDelete && recipeToDelete.imageData) {
-                // Check if the image data looks like a Firebase Storage URL before trying to delete
                 if (recipeToDelete.imageData.startsWith('https://firebasestorage.googleapis.com/')) {
                     try {
                         const oldImageRef = ref(storage, recipeToDelete.imageData);
                         await deleteObject(oldImageRef);
-                        console.log("Image deleted from Storage:", recipeToDelete.imageData);
                         alert("Image deleted from Storage."); // Feedback
                     } catch (err) {
                         // Log but don't stop the process if image deletion fails (e.g., image already gone, bad URL)
                         console.warn("Could not delete image from Storage:", err);
-                        alert("Warning: Could not delete image from Storage. Proceeding with recipe deletion.");
+                        alert("Warning: Could not delete image from Storage. (May not exist or permission issue)."); // Feedback
                     }
                 }
             }
@@ -841,45 +842,51 @@
         
         try {
             let imageUrl = null; 
-            const editId = data.id; // Get editId from data object now
+            const editId = data.id; 
 
             // --- IMAGE UPLOAD LOGIC ---
-            if (currentImageFile) { // A new image file was selected by the user
+            if (currentImageFile) { 
+                alert("Image file detected. Attempting to upload to Storage..."); // Feedback
                 const imageId = `recipe-${crypto.randomUUID()}`; 
                 const storageRef = ref(storage, `recipe_images/${imageId}`);
                 
-                // Perform the actual upload
-                const snapshot = await uploadString(storageRef, currentImageFile, 'data_url');
-                imageUrl = await getDownloadURL(snapshot.ref);
-                alert("Image uploaded successfully!"); // Feedback
-                
-                // If editing, and a NEW image was selected, delete the OLD image if it existed
-                if (editId) {
-                    const oldRecipe = recipes.find(r => r.id === editId);
-                    if (oldRecipe && oldRecipe.imageData && oldRecipe.imageData.startsWith('https://firebasestorage.googleapis.com/')) {
-                        try {
-                            const oldImageRef = ref(storage, oldRecipe.imageData);
-                            await deleteObject(oldImageRef);
-                            console.log("Old image deleted from Storage:", oldRecipe.imageData);
-                        } catch (err) {
-                            console.warn("Could not delete old image from Storage:", err);
+                try {
+                    const snapshot = await uploadString(storageRef, currentImageFile, 'data_url');
+                    imageUrl = await getDownloadURL(snapshot.ref);
+                    alert("Image successfully uploaded to Storage!"); // Feedback
+                    
+                    if (editId) {
+                        const oldRecipe = recipes.find(r => r.id === editId);
+                        if (oldRecipe && oldRecipe.imageData && oldRecipe.imageData.startsWith('https://firebasestorage.googleapis.com/')) {
+                            try {
+                                const oldImageRef = ref(storage, oldRecipe.imageData);
+                                await deleteObject(oldImageRef);
+                                alert("Old image deleted from Storage."); // Feedback
+                            } catch (err) {
+                                console.warn("Could not delete old image from Storage:", err);
+                                alert("Warning: Could not delete old image from Storage. (May not exist or permission issue)."); // Feedback
+                            }
                         }
                     }
+                } catch (imgError) {
+                    alert(`Image upload failed: ${imgError.message}. Check Firebase Storage rules.`); // Feedback
+                    console.error("Image upload failed:", imgError);
+                    btn.textContent = "Save Recipe"; btn.disabled = false;
+                    return; // Stop execution if image upload fails
                 }
             } else if (editId) {
-                // Editing, but no NEW image selected. Retain the EXISTING image URL.
                 const oldRecipe = recipes.find(r => r.id === editId);
                 if (oldRecipe) imageUrl = oldRecipe.imageData;
             }
-            data.imageData = imageUrl; // Update data object with final image URL (can be null, old URL, or new URL)
+            data.imageData = imageUrl; 
 
             // --- FIRESTORE SAVE LOGIC ---
             if(editId) {
                 await updateDoc(doc(db, 'recipes', editId), data);
-                alert("Recipe updated successfully in Firestore!"); // Feedback
+                alert("Recipe successfully updated in Firestore!"); // Feedback
             } else {
                 await addDoc(recipesCollection, data);
-                alert("New recipe added to Firestore successfully!"); // Feedback
+                alert("New recipe successfully added to Firestore!"); // Feedback
             }
             
             await loadRecipes(); // Reload all recipes
@@ -887,7 +894,7 @@
             closeModals();
 
         } catch(error) {
-            alert(`Save failed. Error: ${error.message || "Unknown error"}. Please check Firebase Console for exact details.`);
+            alert(`Recipe save failed: ${error.message}. Check Firebase Firestore rules.`); // General Feedback
             console.error("Error saving recipe:", error);
         } finally {
             btn.textContent = "Save Recipe"; btn.disabled = false;
@@ -1081,7 +1088,7 @@
     document.querySelectorAll('.close-modal').forEach(b => b.onclick = () => {
         document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
         releaseWakeLock(); 
-        stopTimer(); // Ensure timers are stopped when modals close
+        stopTimer(); 
     });
 
     // Edit Button in Detail
@@ -1105,7 +1112,6 @@
     };
 
     // Save Form - Triggered by submit event listener earlier
-
     // Image Upload with Resizing (Triggered by onchange event listener earlier)
     document.getElementById('inpImage').onchange = (e) => {
         const file = e.target.files[0];

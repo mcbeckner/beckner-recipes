@@ -26,6 +26,7 @@
             --modal-bg: #fff;
             --fav-color-filled: #ff4d4d;
             --fav-color-empty: #cccccc;
+            --drag-over-border: 2px dashed var(--button-primary);
         }
 
         body.dark-mode {
@@ -44,6 +45,7 @@
             --modal-bg: #2d2d2d;
             --fav-color-filled: #ff7f7f;
             --fav-color-empty: #555555;
+            --drag-over-border: 2px dashed var(--button-primary);
         }
 
         body {
@@ -535,28 +537,27 @@
     let favorites = []; 
     let mealPlan = {}; 
     let categories = []; 
-    let currentImageFile = null; // Holds the Blob or Data URL from Compressor.js
+    let currentImageFile = null; 
     let activeRecipeId = null;
     let currentTimer = null;
     let wakeLock = null;
 
     // --- INIT ---
     async function init() {
-        alert("DEBUG: App Starting init()...");
-        await loadGlobalData(); // Load Favorites, Meal Plan, Categories
-        await loadRecipes();    // Load Recipe Data
+        console.log("App Starting init()...");
+        await loadGlobalData();
+        await loadRecipes();    
 
         renderCategories();
-        showView('recipes'); // Default view
+        showView('recipes'); 
         
-        // Dark Mode Init
         if(localStorage.getItem('darkMode') === 'true') {
             document.body.classList.add('dark-mode');
             document.getElementById('darkModeBtn').textContent = '☀';
         } else {
             document.getElementById('darkModeBtn').textContent = '🌙';
         }
-        alert("DEBUG: App Initialized. Recipes loaded and UI rendered.");
+        console.log("App Initialized. Recipes loaded and UI rendered.");
     }
 
     // --- COOK MODE (WAKE LOCK) ---
@@ -564,16 +565,16 @@
         if ('wakeLock' in navigator) {
             try {
                 wakeLock = await navigator.wakeLock.request('screen');
-                alert('DEBUG: Screen Wake Lock active'); // Feedback
+                console.log('Screen Wake Lock active');
             } catch (err) {
-                alert(`DEBUG: Wake Lock Error: ${err.name}, ${err.message}`); // Feedback
+                console.warn(`Wake Lock Error: ${err.name}, ${err.message}`);
             }
         }
     }
 
     function releaseWakeLock() {
         if (wakeLock !== null && 'release' in wakeLock) {
-            wakeLock.release().then(() => { wakeLock = null; alert('DEBUG: Screen Wake Lock released'); }); // Feedback
+            wakeLock.release().then(() => { wakeLock = null; console.log('Screen Wake Lock released'); });
         }
     }
 
@@ -589,52 +590,47 @@
             favorites = favSnap.exists() ? (favSnap.data().ids || []) : [];
             mealPlan = planSnap.exists() ? (planSnap.data().plan || {}) : {};
             categories = catSnap.exists() ? (catSnap.data().list || ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks']).sort() : ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks'].sort();
-            alert("DEBUG: Global data (favorites, meal plan, categories) loaded successfully.");
+            console.log("Global data loaded successfully.");
 
         } catch(e) { 
-            alert("ERROR: Failed to load global app settings (favorites, meal plan, categories). Please ensure Firestore rules allow 'read' for 'appData' collection.");
-            console.error("Global data load error:", e); // This will be visible if F12 was enabled
-            favorites = []; // Fallback to empty
-            mealPlan = {};  // Fallback to empty
-            categories = ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks'].sort(); // Fallback to defaults
+            console.error("Global data load error. Possibly first run or network issue. Ensure Firestore rules allow 'read' for 'appData' collection.", e);
+            favorites = [];
+            mealPlan = {};
+            categories = ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks'].sort();
         }
     }
 
     async function saveGlobalFavorites() {
         try {
-            alert("DEBUG: Attempting to save favorites to Cloud.");
             await setDoc(appDataDocFavs, { ids: favorites });
-            alert("DEBUG: Favorites saved to Cloud."); 
+            console.log("Favorites saved to Cloud.");
             if(document.getElementById('viewFavoritesBtn').classList.contains('active')) renderFavoritesList();
-            renderRecipeList(); 
-        } catch(e) { alert("ERROR: Failed to save favorites to Cloud. Check Firebase Firestore rules."); console.error("Error saving favorites:", e); }
+            renderRecipeList();
+        } catch(e) { console.error("Failed to save favorites to Cloud. Check Firebase Firestore rules:", e); }
     }
 
     async function saveGlobalMealPlan() {
         try {
-            alert("DEBUG: Attempting to save meal plan to Cloud.");
             await setDoc(appDataDocPlan, { plan: mealPlan });
-            alert("DEBUG: Meal Plan saved to Cloud."); 
+            console.log("Meal Plan saved to Cloud.");
             renderMealPlanGrid();
-        } catch(e) { alert("ERROR: Failed to save meal plan to Cloud. Check Firebase Firestore rules."); console.error("Error saving meal plan:", e); }
+        } catch(e) { console.error("Failed to save meal plan to Cloud. Check Firebase Firestore rules:", e); }
     }
 
     async function saveGlobalCategories() {
         try {
-            alert("DEBUG: Attempting to save categories to Cloud.");
             await setDoc(appDataDocCats, { list: categories });
-            alert("DEBUG: Categories saved to Cloud."); 
+            console.log("Categories saved to Cloud.");
             renderCategories();
-        } catch(e) { alert("ERROR: Failed to save categories to Cloud. Check Firebase Firestore rules."); console.error("Error saving categories:", e); }
+        } catch(e) { console.error("Failed to save categories to Cloud. Check Firebase Firestore rules:", e); }
     }
 
     async function loadRecipes() {
         try {
-            alert("DEBUG: Attempting to load recipes from Cloud.");
             const snap = await getDocs(recipesCollection);
             recipes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            alert(`DEBUG: Successfully loaded ${recipes.length} recipes from Cloud.`); 
-        } catch(e) { alert("ERROR: Failed to load recipes from Cloud. Check Firebase Firestore rules for 'recipes' collection."); console.error("Error loading recipes:", e); }
+            console.log(`Successfully loaded ${recipes.length} recipes from Cloud.`);
+        } catch(e) { console.error("Failed to load recipes from Cloud. Check Firebase Firestore rules for 'recipes' collection:", e); }
     }
 
     // --- UI RENDERING ---
@@ -711,6 +707,9 @@
 
         div.addEventListener('dragstart', (e) => {
             e.dataTransfer.setData('text/plain', r.id);
+            e.dataTransfer.effectAllowed = 'copyMove';
+            // Mark the source of the drag if coming from a recipe card in the main list
+            e.dataTransfer.setData('application/json', JSON.stringify({ source: 'recipe-list' }));
         });
 
         return div;
@@ -736,41 +735,169 @@
             const content = document.createElement('div');
             content.className = 'day-content';
             
-            col.addEventListener('dragover', (e) => {
+            // Drag and Drop Listeners for meal plan day content area
+            content.addEventListener('dragover', (e) => {
                 e.preventDefault(); 
+                e.dataTransfer.dropEffect = 'move';
                 col.classList.add('drag-over');
+
+                // Visual insertion point
+                const draggable = document.querySelector('.meal-card.dragging'); // Get the dragged item (if internal)
+                if (draggable && content.contains(draggable)) { // If dragging within the same day
+                    const afterElement = getDragAfterElement(content, e.clientY);
+                    if (afterElement == null) {
+                        content.appendChild(draggable);
+                    } else {
+                        content.insertBefore(draggable, afterElement);
+                    }
+                }
             });
-            col.addEventListener('dragleave', () => {
+            content.addEventListener('dragleave', () => {
                 col.classList.remove('drag-over');
             });
-            col.addEventListener('drop', (e) => {
+            content.addEventListener('drop', (e) => {
                 e.preventDefault();
                 col.classList.remove('drag-over');
+                
                 const recipeId = e.dataTransfer.getData('text/plain');
-                if (recipeId) addToMealPlanFromDetail(day.toLowerCase(), recipeId);
+                const dragSourceData = e.dataTransfer.getData('application/json');
+                const sourceInfo = dragSourceData ? JSON.parse(dragSourceData) : {};
+                
+                const targetDayKey = `${week}-${day.toLowerCase()}`;
+                
+                if (sourceInfo.source === 'meal-plan-card') { // Dragging from another meal plan card
+                    const sourceDayKey = sourceInfo.dayKey;
+                    const sourceRecipeId = sourceInfo.recipeId;
+
+                    if (sourceDayKey === targetDayKey) { // Reordering within the same day
+                        // Logic for reordering already handled by dragover, just need to save
+                        const reorderedIds = Array.from(content.children)
+                                            .filter(el => el.classList.contains('meal-card'))
+                                            .map(el => el.dataset.recipeId);
+                        mealPlan[targetDayKey] = reorderedIds;
+                        console.log(`Reordered ${sourceRecipeId} within ${targetDayKey}`);
+                    } else { // Moving between different days
+                        // Remove from source day
+                        mealPlan[sourceDayKey] = mealPlan[sourceDayKey].filter(id => id !== sourceRecipeId);
+                        // Add to target day at correct position
+                        const reorderedIds = Array.from(content.children)
+                                            .filter(el => el.classList.contains('meal-card'))
+                                            .map(el => el.dataset.recipeId);
+                        
+                        // Ensure the dropped item is now part of the content before mapping
+                        const draggedEl = document.querySelector('.meal-card.dragging');
+                        if (draggedEl && draggedEl.dataset.recipeId === sourceRecipeId) {
+                            if (!reorderedIds.includes(sourceRecipeId)) { // If not already in the target, add it
+                                const afterElement = getDragAfterElement(content, e.clientY);
+                                if (afterElement == null) {
+                                    content.appendChild(draggedEl);
+                                } else {
+                                    content.insertBefore(draggedEl, afterElement);
+                                }
+                                mealPlan[targetDayKey] = Array.from(content.children)
+                                                            .filter(el => el.classList.contains('meal-card'))
+                                                            .map(el => el.dataset.recipeId);
+                            }
+                        } else {
+                             // Fallback if dragged element not found, just append
+                             mealPlan[targetDayKey] = [...(mealPlan[targetDayKey] || []), sourceRecipeId];
+                        }
+                        
+                        console.log(`Moved ${sourceRecipeId} from ${sourceDayKey} to ${targetDayKey}`);
+                    }
+                } else { // Dragging from main recipe list
+                    if (recipeId) {
+                        if (mealPlan[targetDayKey] && mealPlan[targetDayKey].includes(recipeId)) {
+                            console.log("Recipe already on this day's plan.");
+                            alert("Recipe already on this day's plan.");
+                        } else {
+                            // Add to target day at correct position
+                            const reorderedIds = Array.from(content.children)
+                                                .filter(el => el.classList.contains('meal-card'))
+                                                .map(el => el.dataset.recipeId);
+
+                            const newMealCardEl = createMealCardElement(recipes.find(r => r.id === recipeId), targetDayKey); // Create new card element
+                            const afterElement = getDragAfterElement(content, e.clientY);
+                            if (afterElement == null) {
+                                content.appendChild(newMealCardEl);
+                            } else {
+                                content.insertBefore(newMealCardEl, afterElement);
+                            }
+                            mealPlan[targetDayKey] = Array.from(content.children)
+                                                        .filter(el => el.classList.contains('meal-card'))
+                                                        .map(el => el.dataset.recipeId);
+                            console.log(`Added ${recipeId} to ${targetDayKey}`);
+                            alert("Added to Meal Plan!");
+                        }
+                    }
+                }
+                
+                // Clear any dragging classes
+                document.querySelectorAll('.meal-card.dragging').forEach(el => el.classList.remove('dragging'));
+
+                saveGlobalMealPlan(); // Save changes to Firebase
             });
 
             const key = `${week}-${day.toLowerCase()}`;
             (mealPlan[key] || []).forEach(id => {
                 const r = recipes.find(x => x.id === id);
                 if(r) {
-                    const card = document.createElement('div');
-                    card.className = 'meal-card';
-                    const img = r.imageData || 'https://via.placeholder.com/150x90?text=Food'; // Slightly smaller placeholder for meal plan
-                    card.innerHTML = `<img src="${img}"><div class="meal-card-title">${r.title}</div><button class="remove-meal-btn">✕</button>`;
-                    card.querySelector('.remove-meal-btn').onclick = (e) => {
-                        e.stopPropagation();
-                        mealPlan[key] = mealPlan[key].filter(x => x !== id);
-                        saveGlobalMealPlan();
-                    };
-                    card.onclick = () => openDetail(r);
-                    content.appendChild(card);
+                    content.appendChild(createMealCardElement(r, key));
                 }
             });
             col.appendChild(content);
             grid.appendChild(col);
         });
     }
+
+    // Helper to create a meal card element (used by renderMealPlanGrid and drag-and-drop)
+    function createMealCardElement(r, dayKey) {
+        const card = document.createElement('div');
+        card.className = 'meal-card';
+        card.draggable = true; // Make meal cards draggable
+        card.dataset.recipeId = r.id; // Store recipe ID
+        
+        const img = r.imageData || 'https://via.placeholder.com/150x90?text=Food';
+        card.innerHTML = `
+            <img src="${img}">
+            <div class="meal-card-title">${r.title}</div>
+            <button class="remove-meal-btn">✕</button>
+        `;
+        card.querySelector('.remove-meal-btn').onclick = (e) => {
+            e.stopPropagation();
+            mealPlan[dayKey] = mealPlan[dayKey].filter(x => x !== r.id);
+            saveGlobalMealPlan();
+        };
+        card.onclick = () => openDetail(r);
+
+        card.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('text/plain', r.id); // For recipe ID
+            e.dataTransfer.effectAllowed = 'move';
+            // Also store source info for internal meal plan moves
+            e.dataTransfer.setData('application/json', JSON.stringify({ source: 'meal-plan-card', recipeId: r.id, dayKey: dayKey }));
+            e.target.classList.add('dragging'); // Add class to the dragged item
+        });
+        card.addEventListener('dragend', (e) => {
+            e.target.classList.remove('dragging'); // Remove class when drag ends
+        });
+
+        return card;
+    }
+
+    // Helper to find the element after which the dragged item should be inserted
+    function getDragAfterElement(container, y) {
+        const draggableElements = [...container.querySelectorAll('.meal-card:not(.dragging)')];
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: -Infinity }).element;
+    }
+
 
     async function addToMealPlanFromDetail(dayKey, recipeId) {
         const week = document.getElementById('mealPlanWeekSelect').value || 'current';
@@ -780,9 +907,9 @@
         if(!mealPlan[key].includes(recipeId)) { // Prevent duplicates
             mealPlan[key].push(recipeId);
             await saveGlobalMealPlan();
-            alert("DEBUG: Added to Meal Plan!"); // Feedback
+            alert("Added to Meal Plan!"); 
         } else {
-            alert("DEBUG: Recipe already on this day's plan.");
+            alert("Recipe already on this day's plan.");
         }
     }
 
@@ -799,26 +926,25 @@
         const recipeToDelete = recipes.find(r => r.id === id);
         
         try {
-            alert("DEBUG: Starting recipe deletion process.");
+            console.log("Starting recipe deletion process.");
             // Attempt to delete image from storage if it exists
             if (recipeToDelete && recipeToDelete.imageData) {
                 if (recipeToDelete.imageData.startsWith('https://firebasestorage.googleapis.com/')) {
                     try {
-                        alert("DEBUG: Attempting to delete image from Storage...");
+                        console.log("Attempting to delete image from Storage...");
                         const oldImageRef = ref(storage, recipeToDelete.imageData);
                         await deleteObject(oldImageRef);
-                        alert("DEBUG: Image deleted from Storage."); 
+                        console.log("Image deleted from Storage."); 
                     } catch (err) {
-                        alert("ERROR: Could not delete image from Storage. (May not exist or permissions). See console for more details.");
                         console.warn("Could not delete image from Storage:", err);
                     }
                 }
             }
 
             // Delete Firestore Document
-            alert("DEBUG: Attempting to delete recipe from Firestore...");
+            console.log("Attempting to delete recipe from Firestore...");
             await deleteDoc(doc(db, 'recipes', id));
-            alert("DEBUG: Recipe deleted from Firestore."); 
+            console.log("Recipe deleted from Firestore."); 
 
             // Cleanup from global lists (local state only, then save)
             if(favorites.includes(id)) { favorites = favorites.filter(x => x !== id); await saveGlobalFavorites(); }
@@ -833,10 +959,10 @@
             });
             if(changed) await saveGlobalMealPlan();
 
-            await loadRecipes(); // Reload all recipes
-            showView(document.querySelector('.view-toggle button.active').id.replace('view','').toLowerCase().replace('btn','')); // Refresh current view
+            await loadRecipes(); 
+            showView(document.querySelector('.view-toggle button.active').id.replace('view','').toLowerCase().replace('btn','')); 
         } catch (e) {
-            alert(`ERROR: Failed to delete recipe. Error: ${e.message || "Unknown error"}. Check Firebase Console for exact details.`);
+            alert(`Failed to delete recipe. Error: ${e.message || "Unknown error"}.`);
             console.error("Error deleting recipe:", e);
         }
     }
@@ -846,37 +972,34 @@
         btn.textContent = "Saving..."; btn.disabled = true;
         
         try {
-            alert("DEBUG: saveRecipe function called, starting image/data processing.");
             let imageUrl = null; 
             const editId = data.id; 
 
             // --- IMAGE UPLOAD LOGIC ---
             if (currentImageFile) { 
-                alert("DEBUG: Image file detected. Attempting to upload to Storage...");
-                const imageId = `recipe-${(window.crypto || crypto).randomUUID()}`; // Use window.crypto for broader compatibility
+                console.log("Image file detected. Attempting to upload to Storage...");
+                const imageId = `recipe-${(window.crypto || crypto).randomUUID()}`; 
                 const storageRef = ref(storage, `recipe_images/${imageId}`);
                 
                 try {
                     const snapshot = await uploadString(storageRef, currentImageFile, 'data_url');
                     imageUrl = await getDownloadURL(snapshot.ref);
-                    alert("DEBUG: Image successfully uploaded to Storage! URL: " + imageUrl);
+                    console.log("Image successfully uploaded to Storage! URL: " + imageUrl);
                     
                     if (editId) {
                         const oldRecipe = recipes.find(r => r.id === editId);
                         if (oldRecipe && oldRecipe.imageData && oldRecipe.imageData.startsWith('https://firebasestorage.googleapis.com/')) {
                             try {
-                                alert("DEBUG: Attempting to delete old image from Storage...");
                                 const oldImageRef = ref(storage, oldRecipe.imageData);
                                 await deleteObject(oldImageRef);
-                                alert("DEBUG: Old image deleted from Storage.");
+                                console.log("Old image deleted from Storage.");
                             } catch (err) {
-                                alert("WARNING: Could not delete old image from Storage. (May not exist or permission issue).");
                                 console.warn("Could not delete old image from Storage:", err);
                             }
                         }
                     }
                 } catch (imgError) {
-                    alert(`ERROR: Image upload failed: ${imgError.message}. Check Firebase Storage rules.`); 
+                    alert(`Image upload failed: ${imgError.message}. Check Firebase Storage rules.`);
                     console.error("Image upload failed:", imgError);
                     btn.textContent = "Save Recipe"; btn.disabled = false;
                     return; 
@@ -888,41 +1011,32 @@
             data.imageData = imageUrl; 
 
             // --- FIRESTORE SAVE LOGIC ---
-            alert("DEBUG: Attempting to save recipe data to Firestore...");
+            console.log("Attempting to save recipe data to Firestore...");
             if(editId) {
                 await updateDoc(doc(db, 'recipes', editId), data);
-                alert("DEBUG: Recipe successfully updated in Firestore!");
+                console.log("Recipe successfully updated in Firestore!");
             } else {
-                const newDocRef = await addDoc(recipesCollection, data);
-                alert("DEBUG: New recipe successfully added to Firestore!");
-                data.id = newDocRef.id; 
+                await addDoc(recipesCollection, data);
+                console.log("New recipe successfully added to Firestore!");
             }
             
-            alert("DEBUG: Reloading all recipes from Cloud and refreshing UI...");
             await loadRecipes(); 
             showView(document.querySelector('.view-toggle button.active').id.replace('view','').toLowerCase().replace('btn','')); 
-            
-            alert("DEBUG: Calling closeModals()..."); // Alert before calling
-            closeModals(); // This is where the error occurred before
-
-            alert("DEBUG: Save process completed successfully!");
+            closeModals();
 
         } catch(error) {
-            alert(`CRITICAL ERROR: Recipe save failed: ${error.message}. This could be a Firebase rule, network issue, or a JavaScript error (e.g., function not found).`); 
+            alert(`Recipe save failed: ${error.message}. Check Firebase rules and console for details.`); 
             console.error("Critical error during save process:", error);
         } finally {
             btn.textContent = "Save Recipe"; btn.disabled = false;
-            alert("DEBUG: Save button re-enabled.");
         }
     }
 
     // --- MODALS ---
     function closeModals() {
-        alert("DEBUG: closeModals() function entered."); // Alert inside function
         document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
         releaseWakeLock(); 
         stopTimer(); 
-        alert("DEBUG: closeModals() function finished."); // Alert at end of function
     }
 
     function openDetail(r) {
@@ -1136,9 +1250,7 @@
 
     // --- FORM SUBMISSION ---
     document.getElementById('recipeForm').onsubmit = async (e) => {
-        alert("DEBUG: Form submit handler started."); 
         e.preventDefault(); 
-        alert("DEBUG: Default form submission prevented. Page should NOT reload."); 
         
         const btn = document.getElementById('btnSave');
         btn.textContent = 'Saving...'; btn.disabled = true;
@@ -1167,19 +1279,16 @@
 
             // Call the main async save function
             await saveRecipe(data); 
-            alert("DEBUG: recipeForm.onsubmit handler completed calling saveRecipe.");
 
         } catch(error) {
-            alert(`CRITICAL ERROR in form submission handler: ${error.message}. This indicates an issue before saveRecipe itself, or in passing data.`);
             console.error("Error in form submission handler:", error);
         } finally {
             btn.textContent = "Save Recipe"; btn.disabled = false;
-            alert("DEBUG: Save button re-enabled from form submit handler.");
         }
     };
 
 
-    // Image Upload with Resizing (Triggered by onchange event listener earlier)
+    // Image Upload with Resizing
     document.getElementById('inpImage').onchange = (e) => {
         const file = e.target.files[0];
         if (!file) {
@@ -1196,13 +1305,13 @@
                 const reader = new FileReader();
                 reader.onloadend = () => {
                     currentImageFile = reader.result; 
-                    alert(`DEBUG: Image compressed to ${ (currentImageFile.length / 1024).toFixed(1) } KB. Ready for upload.`);
+                    console.log(`Image compressed to ${ (currentImageFile.length / 1024).toFixed(1) } KB. Ready for upload.`);
                 };
                 reader.readAsDataURL(result);
             },
             error(err) {
                 console.error("Image compression error:", err.message);
-                alert("ERROR: Image compression failed. Please try a different image or smaller file size.");
+                alert("Image compression failed. Please try a different image or smaller file size.");
                 currentImageFile = null;
             },
         });
@@ -1222,13 +1331,12 @@
     document.getElementById('detNotes').onchange = async (e) => {
         if(activeRecipeId) {
             try {
-                alert("DEBUG: Attempting to save notes to Firestore.");
                 await updateDoc(doc(db, 'recipes', activeRecipeId), { notes: e.target.value });
                 recipes.find(x=>x.id===activeRecipeId).notes = e.target.value;
-                alert("DEBUG: Notes saved successfully.");
+                console.log("Notes saved successfully.");
             } catch(error) {
                 console.error("Failed to save notes:", error);
-                alert("ERROR: Failed to save notes. Check Firebase rules.");
+                alert("Failed to save notes. Check Firebase rules.");
             }
         }
     };
@@ -1244,9 +1352,9 @@
             await saveGlobalCategories(); 
             document.getElementById('inpCategory').value = val; 
             document.getElementById('inpNewCat').value = ''; 
-            alert(`DEBUG: Category "${val}" added.`);
+            console.log(`Category "${val}" added.`);
         } else if (val) {
-            alert(`DEBUG: Category "${val}" already exists.`);
+            alert(`Category "${val}" already exists.`);
         }
     };
 
@@ -1256,7 +1364,7 @@
         if(day && activeRecipeId) {
             await addToMealPlanFromDetail(day, activeRecipeId);
         } else {
-            alert("DEBUG: Please select a day to add to meal plan.");
+            alert("Please select a day to add to meal plan.");
         }
     };
 
@@ -1284,15 +1392,14 @@
             const v = parseInt(e.target.dataset.v);
             updateStars(document.getElementById('detRating'), v);
             try {
-                alert("DEBUG: Attempting to update rating in Firestore.");
                 await updateDoc(doc(db, 'recipes', activeRecipeId), { rating: parseInt(v) });
                 const r = recipes.find(x=>x.id===activeRecipeId);
                 if(r) r.rating = parseInt(v); 
                 renderRecipeList();
-                alert("DEBUG: Rating updated successfully.");
+                console.log("Rating updated successfully.");
             } catch(error) {
                 console.error("Failed to update rating:", error);
-                alert("ERROR: Failed to update rating. Check Firebase rules.");
+                alert("Failed to update rating. Check Firebase rules.");
             }
         }
     }

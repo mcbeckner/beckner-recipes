@@ -509,7 +509,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-    import { getStorage, ref, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
+    import { getStorage, ref, uploadString, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyA_5czSGHpYR8ZHMuB41mnIf5gL8zvLS6M",
@@ -523,19 +523,20 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-    const storage = getStorage(app); // Initialize Firebase Storage
+    const storage = getStorage(app); 
 
     const recipesCollection = collection(db, 'recipes');
+    // App-wide data stored in 'appData' collection, each doc is a type of data
     const appDataDocFavs = doc(db, 'appData', 'favorites');
     const appDataDocPlan = doc(db, 'appData', 'mealPlan');
-    const appDataDocCats = doc(db, 'appData', 'categories'); // Categories document
+    const appDataDocCats = doc(db, 'appData', 'categories');
 
     // --- STATE ---
     let recipes = [];
     let favorites = []; 
     let mealPlan = {}; 
-    let categories = []; // Now loaded from Firestore
-    let currentImageFile = null; // Store the actual file for Compressor.js
+    let categories = []; 
+    let currentImageFile = null; // Holds the Blob or Data URL from Compressor.js
     let activeRecipeId = null;
     let currentTimer = null;
     let wakeLock = null;
@@ -564,6 +565,9 @@
             try {
                 wakeLock = await navigator.wakeLock.request('screen');
                 console.log('Screen Wake Lock active');
+                wakeLock.addEventListener('release', () => {
+                    console.log('Screen Wake Lock released');
+                });
             } catch (err) {
                 console.log(`Wake Lock Error: ${err.name}, ${err.message}`);
             }
@@ -590,8 +594,8 @@
             categories = catSnap.exists() ? (catSnap.data().list || ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks']).sort() : ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks'].sort();
 
         } catch(e) { 
-            console.error("Global data load error. Possibly first run.", e);
-            // Initialize if docs don't exist
+            console.error("Global data load error. Possibly first run or network issue.", e);
+            // Fallback for first run if docs don't exist
             favorites = [];
             mealPlan = {};
             categories = ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks'].sort();
@@ -599,24 +603,32 @@
     }
 
     async function saveGlobalFavorites() {
-        await setDoc(appDataDocFavs, { ids: favorites });
-        if(document.getElementById('viewFavoritesBtn').classList.contains('active')) renderFavoritesList();
-        renderRecipeList(); // Update heart icons
+        try {
+            await setDoc(appDataDocFavs, { ids: favorites });
+            if(document.getElementById('viewFavoritesBtn').classList.contains('active')) renderFavoritesList();
+            renderRecipeList(); // Update heart icons
+        } catch(e) { console.error("Error saving favorites:", e); alert("Failed to save favorites."); }
     }
 
     async function saveGlobalMealPlan() {
-        await setDoc(appDataDocPlan, { plan: mealPlan });
-        renderMealPlanGrid();
+        try {
+            await setDoc(appDataDocPlan, { plan: mealPlan });
+            renderMealPlanGrid();
+        } catch(e) { console.error("Error saving meal plan:", e); alert("Failed to save meal plan."); }
     }
 
     async function saveGlobalCategories() {
-        await setDoc(appDataDocCats, { list: categories });
-        renderCategories();
+        try {
+            await setDoc(appDataDocCats, { list: categories });
+            renderCategories();
+        } catch(e) { console.error("Error saving categories:", e); alert("Failed to save categories."); }
     }
 
     async function loadRecipes() {
-        const snap = await getDocs(recipesCollection);
-        recipes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        try {
+            const snap = await getDocs(recipesCollection);
+            recipes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        } catch(e) { console.error("Error loading recipes:", e); alert("Failed to load recipes."); }
     }
 
     // --- UI RENDERING ---
@@ -625,29 +637,26 @@
         const sel = document.getElementById('categoryFilter');
         const inp = document.getElementById('inpCategory');
         
-        // Preserve current selection on filter dropdown
         const currentFilterValue = sel.value; 
         
         sel.innerHTML = '<option value="all">All Categories</option>';
-        inp.innerHTML = ''; // Clear existing options
+        inp.innerHTML = ''; 
         
         categories.forEach(c => {
             sel.add(new Option(c, c));
             inp.add(new Option(c, c));
         });
         
-        // Restore previous selection, if available
         if (Array.from(sel.options).some(option => option.value === currentFilterValue)) {
             sel.value = currentFilterValue;
         } else {
-            sel.value = 'all'; // Default if previous category is gone
+            sel.value = 'all';
         }
     }
 
     function renderRecipeList() {
         const container = document.getElementById('recipeList');
         container.innerHTML = '';
-        
         const term = document.getElementById('searchInput').value.toLowerCase();
         const cat = document.getElementById('categoryFilter').value;
 
@@ -675,9 +684,8 @@
     function createRecipeCard(r) {
         const div = document.createElement('div');
         div.className = 'recipe-item';
-        // Make card draggable
         div.draggable = true; 
-        div.dataset.recipeId = r.id; // Store ID for drag-and-drop
+        div.dataset.recipeId = r.id; 
         
         const isFav = favorites.includes(r.id);
         const imgSrc = r.imageData || 'https://via.placeholder.com/300x180?text=No+Image';
@@ -695,10 +703,8 @@
         div.querySelector('.delete').onclick = (e) => { e.stopPropagation(); deleteRecipe(r.id); };
         div.onclick = () => openDetail(r);
 
-        // Drag events
         div.addEventListener('dragstart', (e) => {
             e.dataTransfer.setData('text/plain', r.id);
-            console.log('Dragging recipe:', r.id);
         });
 
         return div;
@@ -714,7 +720,7 @@
         days.forEach(day => {
             const col = document.createElement('div');
             col.className = 'meal-day-column';
-            col.dataset.day = day.toLowerCase(); // For drop target identification
+            col.dataset.day = day.toLowerCase(); 
             
             const header = document.createElement('div');
             header.className = 'day-header';
@@ -724,9 +730,8 @@
             const content = document.createElement('div');
             content.className = 'day-content';
             
-            // Drag and Drop Listeners for meal plan days
             col.addEventListener('dragover', (e) => {
-                e.preventDefault(); // Allow drop
+                e.preventDefault(); 
                 col.classList.add('drag-over');
             });
             col.addEventListener('dragleave', () => {
@@ -736,8 +741,7 @@
                 e.preventDefault();
                 col.classList.remove('drag-over');
                 const recipeId = e.dataTransfer.getData('text/plain');
-                console.log('Dropped recipe:', recipeId, 'on day:', day);
-                addToPlan(day.toLowerCase(), recipeId);
+                if (recipeId) addToMealPlanFromDetail(day.toLowerCase(), recipeId);
             });
 
             const key = `${week}-${day.toLowerCase()}`;
@@ -762,12 +766,12 @@
         });
     }
 
-    async function addToPlan(dayKey, recipeId) {
+    async function addToMealPlanFromDetail(dayKey, recipeId) {
         const week = document.getElementById('mealPlanWeekSelect').value || 'current';
         const key = `${week}-${dayKey}`;
         
         if(!mealPlan[key]) mealPlan[key] = [];
-        if(!mealPlan[key].includes(recipeId)) { // Prevent duplicates
+        if(!mealPlan[key].includes(recipeId)) {
             mealPlan[key].push(recipeId);
             await saveGlobalMealPlan();
             alert("Added to Meal Plan!");
@@ -785,33 +789,72 @@
 
     async function deleteRecipe(id) {
         if(confirm("Permanently delete this recipe?")) {
-            // Delete image from storage if exists
             const recipeToDelete = recipes.find(r => r.id === id);
+            
             if (recipeToDelete && recipeToDelete.imageData) {
                 try {
                     const imageRef = ref(storage, recipeToDelete.imageData);
-                    await deleteObject(imageRef);
+                    await deleteObject(imageRef); // Delete image from Storage
                     console.log("Image deleted from Storage:", recipeToDelete.imageData);
                 } catch (e) {
+                    // Ignore error if image doesn't exist or permissions fail, just log
                     console.warn("Could not delete image from Storage (might not exist or permissions):", e);
                 }
             }
 
-            await deleteDoc(doc(db, 'recipes', id));
-            // Cleanup from global lists
-            if(favorites.includes(id)) { favorites = favorites.filter(x => x !== id); await saveGlobalFavorites(); }
-            
-            let changed = false;
-            Object.keys(mealPlan).forEach(k => {
-                if(mealPlan[k].includes(id)) {
-                    mealPlan[k] = mealPlan[k].filter(x => x !== id);
-                    changed = true;
-                }
-            });
-            if(changed) await saveGlobalMealPlan();
+            try {
+                await deleteDoc(doc(db, 'recipes', id));
+                // Cleanup from global lists
+                if(favorites.includes(id)) { favorites = favorites.filter(x => x !== id); await saveGlobalFavorites(); }
+                
+                let changed = false;
+                Object.keys(mealPlan).forEach(k => {
+                    if(mealPlan[k].includes(id)) {
+                        mealPlan[k] = mealPlan[k].filter(x => x !== id);
+                        if(mealPlan[k].length === 0) delete mealPlan[k];
+                        changed = true;
+                    }
+                });
+                if(changed) await saveGlobalMealPlan();
 
+                await loadRecipes();
+                showView(document.querySelector('.view-toggle button.active').id.replace('view','').toLowerCase().replace('btn','')); // Refresh current view
+            } catch (e) {
+                console.error("Error deleting recipe:", e);
+                alert("Failed to delete recipe.");
+            }
+        }
+    }
+
+    async function saveRecipe(data) {
+        const btn = document.getElementById('btnSave');
+        btn.textContent = "Saving..."; btn.disabled = true;
+        
+        try {
+            // Handle image upload if a new file was selected
+            let imageUrl = data.imageData; // Assume already processed or existing
+            if (currentImageFile) {
+                const imageId = crypto.randomUUID(); 
+                const storageRef = ref(storage, `recipe_images/${imageId}`);
+                const snapshot = await uploadString(storageRef, currentImageFile, 'data_url');
+                imageUrl = await getDownloadURL(snapshot.ref);
+                console.log("Image uploaded:", imageUrl);
+            }
+            data.imageData = imageUrl; // Update data object with final image URL
+            
+            if(data.id) {
+                await updateDoc(doc(db, 'recipes', data.id), data);
+            } else {
+                await addDoc(recipesCollection, data);
+            }
             await loadRecipes();
-            renderRecipeList();
+            showView(document.querySelector('.view-toggle button.active').id.replace('view','').toLowerCase().replace('btn','')); // Refresh current view
+            closeModals();
+        } catch(e) {
+            console.error("Error saving recipe:", e);
+            alert("Save failed. Check console for details and Firebase rules.");
+        } finally {
+            btn.textContent = "Save Recipe"; btn.disabled = false;
         }
     }
 
@@ -846,9 +889,9 @@
             const match = step.match(/(\d+)\s*(min|minute|hr|hour)/i);
             if(match) {
                 let duration = parseInt(match[1]);
-                if (match[2].startsWith('h')) duration *= 60; // Convert hours to minutes
+                if (match[2].startsWith('h')) duration *= 60; 
                 const btn = document.createElement('button');
-                btn.className = 'timer-btn primary-btn'; // Use a primary button style
+                btn.className = 'timer-btn primary-btn'; 
                 btn.textContent = `Start ${match[1]}${match[2].startsWith('m')?'m':'h'} Timer`;
                 btn.onclick = () => runTimer(duration, `Step ${index+1}`);
                 p.appendChild(btn);
@@ -857,13 +900,12 @@
         });
 
         document.getElementById('detailModal').classList.add('active');
-        requestWakeLock(); // Start Cook Mode
+        requestWakeLock(); 
     }
 
     function renderIngredients(r, scale) {
         const list = document.getElementById('detIngredients');
         list.innerHTML = '';
-        const originalServings = parseFloat(r.originalServings) || 1;
         
         r.ingredients.forEach(ing => {
             const li = document.createElement('li');
@@ -873,18 +915,45 @@
             if(match) {
                 let qty = match[1].includes('/') ? (parseInt(match[1].split('/')[0]) / parseInt(match[1].split('/')[1])) : parseFloat(match[1]);
                 let rest = match[3];
-                const final = (qty * scale).toFixed(2); // Keep two decimal places initially
+                const final = (qty * scale); 
                 
-                // Smart display for fractions and integers
                 let displayQty;
-                if (final.endsWith('.00')) {
-                    displayQty = parseInt(final); // "2.00" -> "2"
-                } else if (final.endsWith('.50')) {
-                    displayQty = parseFloat(final); // "2.50" -> "2.5"
-                } else if (Math.abs(parseFloat(final) - Math.round(parseFloat(final))) < 0.01) {
-                     displayQty = Math.round(parseFloat(final)); // "1.99" -> "2"
-                } else {
-                    displayQty = parseFloat(final); // Other decimals
+                if (Number.isInteger(final)) {
+                    displayQty = final;
+                } else if (final % 1 === 0.5) { // e.g. 2.5
+                    displayQty = final;
+                } else if (Math.abs(final - Math.round(final)) < 0.01) { // Close to integer
+                    displayQty = Math.round(final);
+                } else if (Math.abs(final - (Math.floor(final) + 1/3)) < 0.01 || Math.abs(final - (Math.floor(final) + 0.33)) < 0.01) {
+                    displayQty = Math.floor(final) + (Math.round((final - Math.floor(final)) * 3)/3); // x and 1/3
+                } else if (Math.abs(final - (Math.floor(final) + 2/3)) < 0.01 || Math.abs(final - (Math.floor(final) + 0.67)) < 0.01) {
+                    displayQty = Math.floor(final) + (Math.round((final - Math.floor(final)) * 3)/3); // x and 2/3
+                }
+                else {
+                    displayQty = final.toFixed(2); // Fallback to 2 decimal places
+                }
+
+                // Convert decimal to fraction for common cases
+                if (String(displayQty).includes('.')) {
+                    const decimalPart = displayQty - Math.floor(displayQty);
+                    let fraction = '';
+                    if (decimalPart > 0.33 - 0.01 && decimalPart < 0.33 + 0.01) fraction = '1/3';
+                    else if (decimalPart > 0.67 - 0.01 && decimalPart < 0.67 + 0.01) fraction = '2/3';
+                    else if (decimalPart > 0.25 - 0.01 && decimalPart < 0.25 + 0.01) fraction = '1/4';
+                    else if (decimalPart > 0.75 - 0.01 && decimalPart < 0.75 + 0.01) fraction = '3/4';
+                    else if (decimalPart > 0.125 - 0.01 && decimalPart < 0.125 + 0.01) fraction = '1/8';
+                    else if (decimalPart > 0.375 - 0.01 && decimalPart < 0.375 + 0.01) fraction = '3/8';
+                    else if (decimalPart > 0.625 - 0.01 && decimalPart < 0.625 + 0.01) fraction = '5/8';
+                    else if (decimalPart > 0.875 - 0.01 && decimalPart < 0.875 + 0.01) fraction = '7/8';
+                    else if (decimalPart > 0.5 - 0.01 && decimalPart < 0.5 + 0.01) fraction = '1/2';
+
+                    if (fraction) {
+                        displayQty = Math.floor(displayQty) || '';
+                        if (displayQty) displayQty = `${displayQty} `;
+                        displayQty = `${displayQty}${fraction}`;
+                    } else {
+                        displayQty = final.toFixed(2).replace(/\.?0+$/, ''); // Clean trailing zeros
+                    }
                 }
                 
                 li.innerHTML = `<span>${displayQty}</span> ${rest}`;
@@ -900,7 +969,7 @@
     }
 
     function runTimer(min, txt) {
-        stopTimer(); // Ensure any existing timer is stopped
+        stopTimer(); 
         const el = document.getElementById('timerIndicator');
         const txtEl = document.getElementById('timerText');
         el.style.display = 'flex';
@@ -909,9 +978,9 @@
         
         currentTimer = setInterval(() => {
             sec--;
-            if (sec < 0) { // Safety check for negative time
+            if (sec < 0) {
                 stopTimer();
-                alert("Timer Finished!");
+                alert(`Timer Finished: ${txt}`);
                 return;
             }
             const m = Math.floor(sec/60);
@@ -919,7 +988,7 @@
             txtEl.textContent = `${txt ? txt+': ' : ''}${m}:${s.toString().padStart(2,'0')}`;
             if(sec === 0) {
                 stopTimer();
-                alert("Timer Finished!");
+                alert(`Timer Finished: ${txt}`);
             }
         }, 1000);
     }
@@ -927,7 +996,7 @@
     function stopTimer() {
         if(currentTimer) clearInterval(currentTimer);
         document.getElementById('timerIndicator').style.display = 'none';
-        currentTimer = null; // Clear reference
+        currentTimer = null;
     }
 
     // --- EVENT LISTENERS ---
@@ -935,39 +1004,24 @@
     // Custom Timer
     document.getElementById('customTimerBtn').onclick = () => {
         const minStr = prompt("Enter minutes for timer:", "5");
-        if(minStr === null) return; // User cancelled
-        const min = parseInt(minStr);
+        if(minStr === null || minStr.trim() === '') return;
+        const min = parseFloat(minStr);
         if(!isNaN(min) && min > 0) runTimer(min, "Custom");
         else alert("Please enter a valid positive number for minutes.");
     };
     document.getElementById('cancelTimerBtn').onclick = stopTimer;
 
     // View Switching
-    const views = ['recipes', 'mealPlan', 'favorites'];
-    views.forEach(v => {
-        document.getElementById(`view${v.charAt(0).toUpperCase() + v.slice(1)}Btn`).onclick = function() {
-            showView(v);
-        }
-    });
-
-    function showView(v) {
-        views.forEach(view => {
-            document.getElementById(`${view}View`).style.display = view === v ? 'block' : 'none';
-            document.getElementById(`view${view.charAt(0).toUpperCase() + view.slice(1)}Btn`).classList.toggle('active', view === v);
-        });
-        document.getElementById('recipeControls').style.display = v === 'recipes' ? 'flex' : 'none';
-        
-        // Render current view
-        if(v === 'recipes') renderRecipeList();
-        else if(v === 'mealPlan') renderMealPlanGrid();
-        else if(v === 'favorites') renderFavoritesList();
-    }
+    document.getElementById('viewRecipesBtn').onclick = () => showView('recipes');
+    document.getElementById('viewMealPlanBtn').onclick = () => showView('mealPlan');
+    document.getElementById('viewFavoritesBtn').onclick = () => showView('favorites');
 
     // Add Modal
     document.getElementById('openAddModalBtn').onclick = () => {
         document.getElementById('recipeForm').reset();
         document.getElementById('editId').value = "";
-        currentImageFile = null; // Reset currentImageFile, not imageURL
+        document.getElementById('inpSource').value = ""; // Clear source URL
+        currentImageFile = null; // Clear image file reference
         updateStars(document.getElementById('inpRating'), 0);
         document.getElementById('modalTitle').textContent = "Add New Recipe";
         document.getElementById('recipeModal').classList.add('active');
@@ -994,8 +1048,7 @@
         document.getElementById('inpInstructions').value = r.instructions.join('\n');
         updateStars(document.getElementById('inpRating'), r.rating);
         document.getElementById('inpRating').dataset.val = r.rating;
-        // Current image is already in Firebase Storage, so currentImageFile remains null unless new file selected
-        currentImageFile = null; 
+        currentImageFile = null; // No new image selected initially
         
         document.getElementById('recipeModal').classList.add('active');
     };
@@ -1007,51 +1060,67 @@
         btn.textContent = 'Saving...';
         btn.disabled = true;
 
-        let imageUrl = null;
-        if (currentImageFile) {
-            // Generate a unique filename for the image
-            const imageId = crypto.randomUUID(); // Requires HTTPS
-            const storageRef = ref(storage, `recipe_images/${imageId}`);
-            try {
-                // Upload resized image (currentImageFile is a Blob from Compressor.js)
-                const snapshot = await uploadString(storageRef, currentImageFile, 'data_url'); // Upload as data_url if it's base64, otherwise use uploadBytes for Blob
+        let imageUrl = null; // This will store the final URL from Storage or existing one
+        const editId = document.getElementById('editId').value;
+
+        try {
+            if (currentImageFile) {
+                // User selected a new image, upload it
+                const imageId = `recipe-${crypto.randomUUID()}`; // Unique ID for image
+                const storageRef = ref(storage, `recipe_images/${imageId}`);
+                const snapshot = await uploadString(storageRef, currentImageFile, 'data_url');
                 imageUrl = await getDownloadURL(snapshot.ref);
                 console.log("Image uploaded to Storage:", imageUrl);
-            } catch (error) {
-                console.error("Error uploading image to Firebase Storage:", error);
-                alert("Failed to upload image. Please try again.");
-                btn.textContent = 'Save Recipe'; btn.disabled = false;
-                return;
+                
+                // If editing and image changed, delete old image from storage if it exists
+                if (editId) {
+                    const oldRecipe = recipes.find(r => r.id === editId);
+                    if (oldRecipe && oldRecipe.imageData) {
+                        try {
+                            const oldImageRef = ref(storage, oldRecipe.imageData);
+                            await deleteObject(oldImageRef);
+                            console.log("Old image deleted from Storage:", oldRecipe.imageData);
+                        } catch (err) {
+                            console.warn("Could not delete old image from Storage:", err);
+                        }
+                    }
+                }
+
+            } else if (editId) {
+                // Editing, but no new image selected. Keep the existing image URL.
+                const oldRecipe = recipes.find(r => r.id === editId);
+                if (oldRecipe) imageUrl = oldRecipe.imageData;
             }
-        } else if (document.getElementById('editId').value) {
-            // If editing and no new file selected, retain existing image URL
-            const oldRecipe = recipes.find(r => r.id === document.getElementById('editId').value);
-            if (oldRecipe) imageUrl = oldRecipe.imageData;
-        }
+            // If new recipe and no image, imageUrl remains null. This is fine.
 
-        const data = {
-            title: document.getElementById('inpTitle').value,
-            category: document.getElementById('inpCategory').value,
-            source: document.getElementById('inpSource').value,
-            originalServings: document.getElementById('inpServings').value,
-            ingredients: document.getElementById('inpIngredients').value.split('\n').filter(x=>x.trim()),
-            instructions: document.getElementById('inpInstructions').value.split('\n').filter(x=>x.trim()),
-            rating: parseInt(document.getElementById('inpRating').dataset.val || 0),
-            imageData: imageUrl
-        };
-        
-        const editId = document.getElementById('editId').value;
-        if(editId) {
-            data.id = editId;
-            const old = recipes.find(x=>x.id===editId);
-            if(old) data.notes = old.notes; // Preserve notes
-        } else {
-            data.notes = "";
-        }
+            const data = {
+                title: document.getElementById('inpTitle').value,
+                category: document.getElementById('inpCategory').value,
+                source: document.getElementById('inpSource').value,
+                originalServings: document.getElementById('inpServings').value,
+                ingredients: document.getElementById('inpIngredients').value.split('\n').filter(x=>x.trim()),
+                instructions: document.getElementById('inpInstructions').value.split('\n').filter(x=>x.trim()),
+                rating: parseInt(document.getElementById('inpRating').dataset.val || 0),
+                imageData: imageUrl
+            };
+            
+            if(editId) {
+                data.id = editId;
+                const old = recipes.find(x=>x.id===editId);
+                if(old) data.notes = old.notes; // Preserve notes if not part of form
+            } else {
+                data.notes = ""; // New recipes start with empty notes
+            }
 
-        await saveRecipe(data); // Calls saveRecipeToFirestore
-        document.getElementById('recipeModal').classList.remove('active');
-        btn.textContent = "Save Recipe"; btn.disabled = false;
+            await saveRecipe(data); // Calls saveRecipeToFirestore
+            document.getElementById('recipeModal').classList.remove('active');
+
+        } catch(error) {
+            console.error("Save failed during image upload or Firestore write:", error);
+            alert("Failed to save recipe. Please check console for details and ensure Firebase Storage rules are correct.");
+        } finally {
+            btn.textContent = "Save Recipe"; btn.disabled = false;
+        }
     };
 
     // Image Upload with Resizing
@@ -1063,16 +1132,16 @@
         }
 
         new Compressor(file, {
-            quality: 0.6, // Adjust quality as needed (0.6 is 60%)
-            maxWidth: 800, // Max width for the image
-            maxHeight: 600, // Max height for the image
-            convertSize: 500000, // Convert to JPEG if size is over 0.5MB, otherwise keep original format
+            quality: 0.6, 
+            maxWidth: 800, 
+            maxHeight: 600, 
+            convertSize: 500000, // Convert to JPEG if size is over 0.5MB
             success(result) {
-                // The result is a Blob, convert to Data URL for uploadString
+                // Read the compressed Blob as a Data URL
                 const reader = new FileReader();
                 reader.onloadend = () => {
-                    currentImageFile = reader.result; // This is the base64 string of the compressed image
-                    console.log("Image compressed and ready for upload. Size:", currentImageFile.length / 1024, "KB");
+                    currentImageFile = reader.result; // This is the base64 string
+                    console.log("Image compressed and ready. Size:", currentImageFile.length / 1024, "KB");
                 };
                 reader.readAsDataURL(result);
             },
@@ -1097,8 +1166,13 @@
     // Notes Autosave
     document.getElementById('detNotes').onchange = async (e) => {
         if(activeRecipeId) {
-            await updateDoc(doc(db, 'recipes', activeRecipeId), { notes: e.target.value });
-            recipes.find(x=>x.id===activeRecipeId).notes = e.target.value;
+            try {
+                await updateDoc(doc(db, 'recipes', activeRecipeId), { notes: e.target.value });
+                recipes.find(x=>x.id===activeRecipeId).notes = e.target.value;
+            } catch(error) {
+                console.error("Failed to save notes:", error);
+                alert("Failed to save notes.");
+            }
         }
     };
 
@@ -1110,9 +1184,9 @@
         if(val && !categories.includes(val)) {
             categories.push(val);
             categories.sort();
-            await saveGlobalCategories(); // Save to Firestore
-            document.getElementById('inpCategory').value = val; // Select the new category
-            document.getElementById('inpNewCat').value = ''; // Clear input
+            await saveGlobalCategories(); 
+            document.getElementById('inpCategory').value = val; 
+            document.getElementById('inpNewCat').value = ''; 
         } else if (val) {
             alert(`Category "${val}" already exists.`);
         }
@@ -1122,7 +1196,7 @@
     document.getElementById('btnAddToPlan').onclick = async () => {
         const day = document.getElementById('detPlanDay').value;
         if(day && activeRecipeId) {
-            await addToPlan(day, activeRecipeId);
+            await addToMealPlanFromDetail(day, activeRecipeId);
         } else {
             alert("Please select a day to add to meal plan.");
         }
@@ -1151,10 +1225,15 @@
         if(e.target.tagName === 'SPAN' && activeRecipeId) {
             const v = parseInt(e.target.dataset.v);
             updateStars(document.getElementById('detRating'), v);
-            await updateDoc(doc(db, 'recipes', activeRecipeId), { rating: v });
-            const r = recipes.find(x=>x.id===activeRecipeId);
-            if(r) r.rating = v; // Update local state
-            renderRecipeList(); // Refresh list to show updated rating/sort
+            try {
+                await updateDoc(doc(db, 'recipes', activeRecipeId), { rating: parseInt(v) });
+                const r = recipes.find(x=>x.id===activeRecipeId);
+                if(r) r.rating = parseInt(v); 
+                renderRecipeList();
+            } catch(error) {
+                console.error("Failed to update rating:", error);
+                alert("Failed to update rating.");
+            }
         }
     }
 

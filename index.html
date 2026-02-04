@@ -293,7 +293,7 @@
             <form id="recipeForm">
                 <input type="hidden" id="editId">
                 <input type="text" id="inpTitle" placeholder="Recipe Title" required>
-                <input type="url" id="inpSource" placeholder="Source URL">
+                <input type="url" id="inpSource" placeholder="Source URL"> <!-- REMOVED 'required' -->
                 
                 <!-- TAGS INPUT -->
                 <label style="margin-top:10px; display:block; font-weight:bold;">Tags (comma-separated):</label>
@@ -493,25 +493,33 @@
 
     async function loadRecipes() {
         try {
-            console.log("Loading recipes...");
+            console.log("--- loadRecipes START ---");
             const snap = await getDocs(collection(db, 'recipes'));
-            recipes = snap.docs.map(d => {
+            console.log(`Firestore snapshot received. Number of docs: ${snap.docs.length}`);
+            
+            const loadedData = snap.docs.map(d => {
                 const recipeData = d.data();
-                // IMPORTANT: Data migration/standardization on load
-                // If an old recipe has 'category' (string), convert it to 'tags' (array)
+                // Data migration logic: If an old recipe has 'category' (string), convert it to 'tags' (array)
                 if (recipeData.category && !recipeData.tags) {
                     console.log(`Migrating category "${recipeData.category}" to tags for recipe ${d.id}`);
                     recipeData.tags = [recipeData.category];
-                    // You might want to remove the old 'category' field from Firestore if this is a one-time migration
-                    // For now, just deleting it from the local object.
                     delete recipeData.category; 
                 } else if (!recipeData.tags) {
+                    recipeData.tags = []; // Ensure tags array exists
+                }
+                // Also ensure tags is an array, even if empty
+                if (!Array.isArray(recipeData.tags)) {
                     recipeData.tags = [];
                 }
                 return { id: d.id, ...recipeData };
             });
-            console.log(`Loaded ${recipes.length} recipes.`);
-        } catch(e) { console.error("Failed to load recipes:", e); }
+            recipes = loadedData;
+            console.log(`Successfully loaded ${recipes.length} recipes into global state.`);
+            console.log("--- loadRecipes END ---");
+        } catch(e) { 
+            console.error("FAILED to load recipes from Firestore:", e);
+            recipes = []; // Ensure state is empty on error
+        }
     }
 
     // --- TAG RENDERING AND MANAGEMENT ---
@@ -567,6 +575,7 @@
 
     // --- RECIPE LIST RENDERING ---
     function renderRecipeList() {
+        console.log(`renderRecipeList() called. Current recipes.length: ${recipes.length}`);
         const container = document.getElementById('recipeList');
         container.innerHTML = '';
         const term = document.getElementById('searchInput').value.toLowerCase();
@@ -584,6 +593,7 @@
     }
     
     function renderFavoritesList() {
+        console.log(`renderFavoritesList() called. Current recipes.length: ${recipes.length}`);
         const container = document.getElementById('favoritesList');
         container.innerHTML = '';
         const list = recipes.filter(r => favorites.includes(r.id));
@@ -607,7 +617,7 @@
             <h3>${r.title}</h3>
         `;
         div.querySelector('.fav').onclick = (e) => { e.stopPropagation(); toggleFavorite(r.id); };
-        div.querySelector('.delete').onclick = (e) => { e.stopPropagation(); deleteRecipe(r.id); }; // RESTORED DELETE
+        div.querySelector('.delete').onclick = (e) => { e.stopPropagation(); deleteRecipe(r.id); }; // DELETE RESTORED
         div.onclick = () => openDetail(r);
         div.addEventListener('dragstart', (e) => {
             e.dataTransfer.setData('text/plain', r.id);
@@ -893,15 +903,16 @@
     
     // Comprehensive list of unit variations and their normalized singular forms
     const unitMap = {
+        'tsp': 'teaspoon', 'tsps': 'teaspoon', 't': 'teaspoon', 'teaspoon': 'teaspoon', 'teaspoons': 'teaspoon',
+        'tbsp': 'tablespoon', 'tbsps': 'tablespoon', 'T': 'tablespoon', 'tablespoon': 'tablespoon', 'tablespoons': 'tablespoon',
         'cup': 'cup', 'cups': 'cup', 'c': 'cup', 'c.': 'cup',
-        'teaspoon': 'teaspoon', 'teaspoons': 'teaspoon', 'tsp': 'teaspoon', 'tsps': 'teaspoon', 't': 'teaspoon',
-        'tablespoon': 'tablespoon', 'tablespoons': 'tablespoon', 'tbsp': 'tablespoon', 'tbsps': 'tablespoon', 'T': 'tablespoon',
-        'gram': 'gram', 'grams': 'gram', 'g': 'gram', 'g.': 'gram',
-        'kilogram': 'kilogram', 'kilograms': 'kilogram', 'kg': 'kilogram', 'kg.': 'kilogram',
-        'milliliter': 'milliliter', 'milliliters': 'milliliter', 'ml': 'milliliter', 'ml.': 'milliliter',
-        'liter': 'liter', 'liters': 'liter', 'l': 'liter', 'l.': 'liter',
-        'ounce': 'ounce', 'ounces': 'ounce', 'oz': 'ounce', 'oz.': 'ounce', 'fl oz': 'fluid ounce', 'fluid ounce': 'fluid ounce',
-        'pound': 'pound', 'pounds': 'pound', 'lb': 'pound', 'lbs': 'pound', 'lb.': 'pound', 'lbs.': 'pound',
+        'floz': 'fluid ounce', 'fl oz': 'fluid ounce', 'fluid ounce': 'fluid ounce', 'fluid ounces': 'fluid ounce',
+        'ml': 'milliliter', 'milliliter': 'milliliter', 'milliliters': 'milliliter',
+        'l': 'liter', 'liter': 'liter', 'liters': 'liter',
+        'g': 'gram', 'gram': 'gram', 'grams': 'gram',
+        'oz_w': 'ounce', 'oz': 'ounce', 'ounce': 'ounce', 'ounces': 'ounce', // oz (weight)
+        'lb': 'pound', 'lbs': 'pound', 'pound': 'pound', 'pounds': 'pound',
+        'kg': 'kilogram', 'kilogram': 'kilogram', 'kilograms': 'kilogram',
         'pinch': 'pinch', 'pinches': 'pinch', 'dash': 'dash', 'dashes': 'dash',
         'clove': 'clove', 'cloves': 'clove', 'stalk': 'stalk', 'stalks': 'stalk',
         'sprig': 'sprig', 'sprigs': 'sprig', 'can': 'can', 'cans': 'can',
@@ -922,11 +933,11 @@
         'sweet', 'sour', 'bitter', 'spicy', 'hot', 'mild', 'extra', 'fine', 'coarse',
         'cold', 'warm', 'hot', 'room temperature', 'chilled', 'lukewarm',
         'packed', 'heaping', 'lightly packed', 'loose', 'a', 'an', 'the', 'some',
-        'good quality', 'best quality', 'superfine', 'blanched',
+        'good quality', 'best quality', 'superfine', 'blanched', 'confectioners', 'powdered',
         'a pinch of', 'a dash of', 'a sprinkle of', 'a couple of', 'toasted', 'roasted', 'cooked', 'raw',
-        'organic', 'farm-fresh', 'aged', 'filtered', 'divided', 'such as',
+        'organic', 'farm-fresh', 'aged', 'filtered', 'divided', 'such as', 'plus more for dusting', 'plus more for serving', 'for pan', 'for coating',
         'or more', 'or less', 'about', 'approximately', 'small', 'medium', 'large', 'jumbo', 'extra large', 'tiny', 'baby',
-        'for serving', 'for garnish', 'as needed', 'to taste', 'optional', 'plus more for dusting', 'plus more for serving', 'for pan', 'for coating'
+        'for serving', 'for garnish', 'as needed', 'to taste', 'optional', 'and' // 'and' is a common connector, might be stripped
     ];
 
     // Default aisle mapping (you can expand this list!)
@@ -934,14 +945,14 @@
         'flour': 'Baking', 'sugar': 'Baking', 'baking powder': 'Baking', 'baking soda': 'Baking', 'vanilla extract': 'Baking',
         'butter': 'Dairy', 'milk': 'Dairy', 'cheese': 'Dairy', 'yogurt': 'Dairy', 'eggs': 'Dairy', 'cream': 'Dairy',
         'chicken': 'Meat & Seafood', 'beef': 'Meat & Seafood', 'pork': 'Meat & Seafood', 'fish': 'Meat & Seafood', 'shrimp': 'Meat & Seafood',
-        'onion': 'Produce', 'garlic': 'Produce', 'potato': 'Produce', 'carrot': 'Produce', 'lettuce': 'Produce', 'tomato': 'Produce', 'apple': 'Produce', 'banana': 'Produce', 'berry': 'Produce', 'lemon': 'Produce', 'lime': 'Produce',
-        'salt': 'Spices & Seasonings', 'pepper': 'Spices & Seasonings', 'oregano': 'Spices & Seasonings', 'cumin': 'Spices & Seasonings', 'basil': 'Spices & Seasonings', 'thyme': 'Spices & Seasonings', 'paprika': 'Spices & Seasonings',
-        'pasta': 'Pantry', 'rice': 'Pantry', 'canola oil': 'Pantry', 'olive oil': 'Pantry', 'vinegar': 'Pantry', 'broth': 'Pantry', 'canned tomato': 'Pantry', 'beans': 'Pantry', 'cereal': 'Pantry', 'coffee': 'Pantry', 'tea': 'Pantry',
+        'onion': 'Produce', 'garlic': 'Produce', 'potato': 'Produce', 'carrot': 'Produce', 'lettuce': 'Produce', 'tomato': 'Produce', 'apple': 'Produce', 'banana': 'Produce', 'berry': 'Produce', 'lemon': 'Produce', 'lime': 'Produce', 'bell pepper': 'Produce', 'mushroom': 'Produce',
+        'salt': 'Spices & Seasonings', 'pepper': 'Spices & Seasonings', 'oregano': 'Spices & Seasonings', 'cumin': 'Spices & Seasonings', 'basil': 'Spices & Seasonings', 'thyme': 'Spices & Seasonings', 'paprika': 'Spices & Seasonings', 'garlic powder': 'Spices & Seasonings', 'onion powder': 'Spices & Seasonings',
+        'pasta': 'Pantry', 'rice': 'Pantry', 'canola oil': 'Pantry', 'olive oil': 'Pantry', 'vinegar': 'Pantry', 'broth': 'Pantry', 'canned tomato': 'Pantry', 'beans': 'Pantry', 'cereal': 'Pantry', 'coffee': 'Pantry', 'tea': 'Pantry', 'soup': 'Pantry', 'sauce': 'Pantry',
         'bread': 'Bakery', 'rolls': 'Bakery', 'baguette': 'Bakery'
     };
 
     function getAisleSuggestion(ingredientName) {
-        // First, check if the ingredient has an explicit aisle defined by the user
+        // First, check if the ingredient has an explicit aisle defined by the user (e.g., "2 cups flour // Baking")
         const aisleMatch = ingredientName.match(/(\s*\/\/\s*)([^/]+)$/);
         if (aisleMatch && aisleMatch[2]) {
             // Capitalize first letter of each word in the aisle name
@@ -949,10 +960,13 @@
         }
 
         // If not, use the default map
-        for (const [key, aisle] of Object.entries(defaultAisleMap)) {
-            // Check if the ingredient name contains the key
-            if (ingredientName.includes(key)) {
-                return aisle;
+        // Iterate over keys in reverse order to prioritize more specific matches (e.g., "bell pepper" before "pepper")
+        const sortedMapKeys = Object.keys(defaultAisleMap).sort((a, b) => b.length - a.length);
+        for (const key of sortedMapKeys) {
+            // Use word boundary to avoid matching "pepper" in "bell pepper" if "bell pepper" is a key
+            const keyRegex = new RegExp(`\\b${key}\\b`, 'i');
+            if (keyRegex.test(ingredientName)) {
+                return defaultAisleMap[key];
             }
         }
         return 'Other'; // Fallback
@@ -964,8 +978,9 @@
         let unit = '';
         let aisle = getAisleSuggestion(original); 
 
-        // Strip user-defined aisle hint before parsing quantities/units
         let remaining = original;
+
+        // Strip user-defined aisle hint before parsing quantities/units
         const aisleHintRemovedMatch = remaining.match(/^(.*?)(?:\s*\/\/\s*[^/]+)$/);
         if (aisleHintRemovedMatch) {
             remaining = aisleHintRemovedMatch[1].trim();
@@ -1121,7 +1136,7 @@
         // Sort aisles for display
         const customAisleOrder = [
             'Produce', 'Bakery', 'Meat & Seafood', 'Dairy', 'Frozen', 'Pantry', 'Baking', 
-            'Spices & Seasonings', 'Beverages', 'Canned Goods', 'Other'
+            'Spices & Seasonings', 'Canned Goods', 'Beverages', 'Other' // Adjusted order for common grocery flow
         ];
         const sortedAisles = Object.keys(itemsByAisle).sort((a, b) => {
             const indexA = customAisleOrder.indexOf(a);
@@ -1336,17 +1351,17 @@
     const CONVERSION_FACTORS = {
         // All units convert to a base unit (ml for volume, g for weight)
         volume: {
-            'tsp': 4.92892,
-            'tbsp': 14.7868,
-            'cup': 236.588,
-            'floz': 29.5735,
+            'tsp': 4.92892, // 1 tsp = 4.92892 ml
+            'tbsp': 14.7868, // 1 tbsp = 14.7868 ml
+            'cup': 236.588, // 1 cup = 236.588 ml
+            'floz': 29.5735, // 1 fl oz = 29.5735 ml
             'ml': 1,
             'l': 1000
         },
         weight: {
             'g': 1,
-            'oz_w': 28.3495, // oz (weight)
-            'lb': 453.592,
+            'oz_w': 28.3495, // 1 oz (weight) = 28.3495 g
+            'lb': 453.592, // 1 lb = 453.592 g
             'kg': 1000
         }
     };
@@ -1357,16 +1372,25 @@
         inputSelect.innerHTML = '';
         outputSelect.innerHTML = '';
 
-        const allUnits = [...Object.keys(CONVERSION_FACTORS.volume), ...Object.keys(CONVERSION_FACTORS.weight)];
-        allUnits.forEach(unit => {
+        const unitsOrdered = [
+            // Volume
+            {value: 'tsp', text: 'tsp'}, {value: 'tbsp', text: 'tbsp'},
+            {value: 'cup', text: 'cup'}, {value: 'floz', text: 'fl oz'},
+            {value: 'ml', text: 'ml'}, {value: 'l', text: 'L'},
+            // Weight
+            {value: 'g', text: 'g'}, {value: 'oz_w', text: 'oz (weight)'},
+            {value: 'lb', text: 'lb'}, {value: 'kg', text: 'kg'}
+        ];
+
+        unitsOrdered.forEach(unit => {
             const option1 = document.createElement('option');
-            option1.value = unit;
-            option1.textContent = unit;
+            option1.value = unit.value;
+            option1.textContent = unit.text;
             inputSelect.appendChild(option1);
 
             const option2 = document.createElement('option');
-            option2.value = unit;
-            option2.textContent = unit;
+            option2.value = unit.value;
+            option2.textContent = unit.text;
             outputSelect.appendChild(option2);
         });
 
@@ -1388,7 +1412,7 @@
         const outputSpan = document.getElementById('convertOutputQty');
 
         if (isNaN(qty) || qty <= 0) {
-            outputSpan.textContent = "Invalid Qty";
+            outputSpan.textContent = "0"; // Display 0 for invalid input
             return;
         }
 
@@ -1396,12 +1420,12 @@
         const toType = getUnitType(toUnit);
 
         if (!fromType || !toType) {
-            outputSpan.textContent = "Unknown Unit";
+            outputSpan.textContent = "Error: Unit Not Found";
             return;
         }
 
         if (fromType !== toType) {
-            outputSpan.textContent = "Can't convert volume to weight directly.";
+            outputSpan.textContent = "Error: Volume ↔ Weight";
             return;
         }
 
@@ -1413,7 +1437,7 @@
 
     // --- EVENT LISTENERS ---
     
-    // Timer functions (unchanged)
+    // Timer functions
     document.getElementById('customTimerBtn').onclick = () => {
         const minStr = prompt("Enter minutes for timer:", "5");
         if(minStr && !isNaN(parseFloat(minStr))) runTimer(parseFloat(minStr), "Custom");

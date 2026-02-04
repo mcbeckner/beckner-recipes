@@ -108,7 +108,7 @@
         .split-view-container { display: flex; flex: 1; overflow: hidden; }
         .split-col { flex: 1; overflow-y: auto; padding: 20px 25px; }
         .split-col.left { flex: 0 0 35%; border-right: 1px solid var(--border-color); background: rgba(0,0,0,0.02); }
-        @media (max-width: 768px) { .split-view-container { flex-direction: column; overflow-y: auto; } .split-col { overflow: visible; flex: none; } }
+        @media (max-width: 768px) { .split-view-container { flex-direction: column; overflow-y: auto; } .split-col { overflow: visible; flex: none; border-bottom: 1px solid var(--border-color); } }
         
         .ingredient-list li { padding: 8px 0; border-bottom: 1px solid var(--border-color); display: flex; }
         .ingredient-list li.checked { text-decoration: line-through; opacity: 0.5; }
@@ -324,15 +324,18 @@
 
     // --- INIT ---
     async function init() {
+        console.log("App initializing...");
         await loadGlobalData();
         await loadRecipes();    
         renderCategories();
         showView('recipes'); 
         if(localStorage.getItem('darkMode') === 'true') document.body.classList.add('dark-mode');
+        console.log("App initialized.");
     }
 
     async function loadGlobalData() {
         try {
+            console.log("Loading global data (favorites, mealPlan, categories)...");
             const [favSnap, planSnap, catSnap] = await Promise.all([
                 getDoc(doc(db, 'appData', 'favorites')),
                 getDoc(doc(db, 'appData', 'mealPlan')),
@@ -340,14 +343,22 @@
             ]);
             favorites = favSnap.exists() ? (favSnap.data().ids || []) : [];
             mealPlan = planSnap.exists() ? (planSnap.data().plan || {}) : {};
-            categories = catSnap.exists() ? (catSnap.data().list || []) : ['Breakfast', 'Dinner'].sort();
-        } catch(e) { console.log("New app or offline. Initializing default data."); }
+            categories = catSnap.exists() ? (catSnap.data().list || ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks']).sort() : ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks'].sort();
+            console.log("Global data loaded.");
+        } catch(e) { 
+            console.error("Error loading global data. Initializing defaults:", e);
+            favorites = [];
+            mealPlan = {};
+            categories = ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks'].sort();
+        }
     }
 
     async function loadRecipes() {
         try {
+            console.log("Loading recipes...");
             const snap = await getDocs(collection(db, 'recipes'));
             recipes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            console.log(`Loaded ${recipes.length} recipes.`);
         } catch(e) { console.error("Failed to load recipes:", e); }
     }
 
@@ -380,6 +391,15 @@
         document.getElementById('emptyMessage').style.display = filtered.length ? 'none' : 'block';
         filtered.forEach(r => container.appendChild(createRecipeCard(r)));
     }
+    
+    function renderFavoritesList() {
+        const container = document.getElementById('favoritesList');
+        container.innerHTML = '';
+        const list = recipes.filter(r => favorites.includes(r.id));
+        document.getElementById('emptyFavMessage').style.display = list.length ? 'none' : 'block';
+        list.forEach(r => container.appendChild(createRecipeCard(r)));
+    }
+
 
     function createRecipeCard(r) {
         const div = document.createElement('div');
@@ -399,6 +419,7 @@
         div.addEventListener('dragstart', (e) => {
             e.dataTransfer.setData('text/plain', r.id);
             e.dataTransfer.setData('source-type', 'list'); // Indicate drag is from recipe list (copy)
+            console.log(`Dragstart from list: Recipe ID ${r.id}, Source Type 'list'`);
         });
         return div;
     }
@@ -480,6 +501,7 @@
 
     // --- MEAL PLAN & SHOPPING ---
     function renderMealPlanGrid() {
+        console.log("Rendering meal plan grid...");
         const grid = document.getElementById('mealPlanGrid');
         grid.innerHTML = '';
         const week = document.getElementById('mealPlanWeekSelect').value;
@@ -518,12 +540,18 @@
                 const sourceType = e.dataTransfer.getData('source-type'); // 'list' or 'plan'
                 const sourceDayKey = e.dataTransfer.getData('source-day'); // Only for 'plan' type drags
                 
-                if (!recipeId) return;
+                console.log(`Drop event: Recipe ID ${recipeId}, Source Type '${sourceType}', Source Day '${sourceDayKey}', Target Day '${dayKey}'`);
+
+                if (!recipeId) {
+                    console.log("No recipe ID in dataTransfer, ignoring drop.");
+                    return;
+                }
 
                 if (!mealPlan[dayKey]) mealPlan[dayKey] = [];
 
-                // Handle MOVE operation (from one day to another)
+                // Handle MOVE operation (from one meal plan day to another)
                 if (sourceType === 'plan' && sourceDayKey && sourceDayKey !== dayKey) {
+                    console.log(`Performing MOVE: Removing from ${sourceDayKey}, adding to ${dayKey}`);
                     // Remove from old day
                     mealPlan[sourceDayKey] = mealPlan[sourceDayKey].filter(id => id !== recipeId);
                     if (mealPlan[sourceDayKey].length === 0) delete mealPlan[sourceDayKey]; // Clean up empty day
@@ -531,21 +559,25 @@
                     // Add to new day if not already there
                     if (!mealPlan[dayKey].includes(recipeId)) {
                         mealPlan[dayKey].push(recipeId);
+                    } else {
+                        console.log(`Recipe ${recipeId} already exists in target day ${dayKey}.`);
                     }
-                    console.log(`Moved recipe ${recipeId} from ${sourceDayKey} to ${dayKey}`);
                 } 
                 // Handle COPY operation (from the main recipe list)
                 else if (sourceType === 'list') {
+                    console.log(`Performing COPY: Adding to ${dayKey} from main list.`);
                     if (mealPlan[dayKey].includes(recipeId)) {
                         alert("Recipe already on this day's plan.");
                     } else {
                         mealPlan[dayKey].push(recipeId);
-                        console.log(`Copied recipe ${recipeId} to ${dayKey}`);
                     }
                 } 
                 // Handle drag within the same day (no change to content, only visual if reordering were implemented)
                 else if (sourceType === 'plan' && sourceDayKey === dayKey) {
-                    console.log(`Dragged recipe ${recipeId} within ${dayKey} (no change to order for now)`);
+                    console.log(`Dragged recipe ${recipeId} within ${dayKey} (no change to data, reordering not implemented yet)`);
+                    // If you wanted to allow reordering, you'd need more complex DOM manipulation here
+                } else {
+                    console.log("Drop event occurred, but no specific action taken based on source type or day.");
                 }
 
                 await setDoc(doc(db, 'appData', 'mealPlan'), { plan: mealPlan });
@@ -570,6 +602,7 @@
         
         card.querySelector('.remove-meal-btn').onclick = async (e) => {
             e.stopPropagation();
+            console.log(`Removing recipe ${r.id} from day ${dayKey}`);
             mealPlan[dayKey] = mealPlan[dayKey].filter(x => x !== r.id);
             if (mealPlan[dayKey].length === 0) delete mealPlan[dayKey]; // Clean up empty day
             await setDoc(doc(db, 'appData', 'mealPlan'), { plan: mealPlan });
@@ -580,6 +613,7 @@
             e.dataTransfer.setData('text/plain', r.id);
             e.dataTransfer.setData('source-type', 'plan'); // Indicate drag is from meal plan (move potential)
             e.dataTransfer.setData('source-day', dayKey); // Store source day key
+            console.log(`Dragstart from meal plan: Recipe ID ${r.id}, Source Type 'plan', Source Day '${dayKey}'`);
         });
         
         card.onclick = () => openDetail(r);
@@ -621,23 +655,63 @@
 
     // --- SMART SHOPPING & FRACTIONS ---
 
+    const quantityRegex = /^(\d+(?:\.\d+)?|\d+\s*\d*\/\d+|\d+\/\d+)/; // Matches "1", "0.5", "1 1/2", "1/2"
+    
+    // Comprehensive list of unit variations and their normalized singular forms
+    const unitMap = {
+        'cup': 'cup', 'cups': 'cup', 'c': 'cup', 'c.': 'cup',
+        'teaspoon': 'teaspoon', 'teaspoons': 'teaspoon', 'tsp': 'teaspoon', 'tsps': 'teaspoon', 't': 'teaspoon',
+        'tablespoon': 'tablespoon', 'tablespoons': 'tablespoon', 'tbsp': 'tablespoon', 'tbsps': 'tablespoon', 'T': 'tablespoon',
+        'gram': 'gram', 'grams': 'gram', 'g': 'gram', 'g.': 'gram',
+        'kilogram': 'kilogram', 'kilograms': 'kilogram', 'kg': 'kilogram', 'kg.': 'kilogram',
+        'milliliter': 'milliliter', 'milliliters': 'milliliter', 'ml': 'milliliter', 'ml.': 'milliliter',
+        'liter': 'liter', 'liters': 'liter', 'l': 'liter', 'l.': 'liter',
+        'ounce': 'ounce', 'ounces': 'ounce', 'oz': 'ounce', 'oz.': 'ounce',
+        'pound': 'pound', 'pounds': 'pound', 'lb': 'pound', 'lbs': 'pound', 'lb.': 'pound', 'lbs.': 'pound',
+        'pinch': 'pinch', 'pinches': 'pinch', 'dash': 'dash', 'dashes': 'dash',
+        'clove': 'clove', 'cloves': 'clove', 'stalk': 'stalk', 'stalks': 'stalk',
+        'sprig': 'sprig', 'sprigs': 'sprig', 'can': 'can', 'cans': 'can',
+        'package': 'package', 'packages': 'package', 'box': 'box', 'boxes': 'box',
+        'slice': 'slice', 'slices': 'slice', 'head': 'head', 'heads': 'head',
+        'leaf': 'leaf', 'leaves': 'leaf', 'container': 'container', 'containers': 'container',
+        'each': 'each', 'ea': 'each', 'piece': 'piece', 'pieces': 'piece',
+        'bottle': 'bottle', 'bottles': 'bottle', 'jar': 'jar', 'jars': 'jar',
+        'carton': 'carton', 'cartons': 'carton', 'bunch': 'bunch', 'bunches': 'bunch',
+        'bag': 'bag', 'bags': 'bag', 'drop': 'drop', 'drops': 'drop'
+    };
+
+    const commonDescriptors = [
+        'melted', 'softened', 'diced', 'chopped', 'sliced', 'minced', 'grated', 'shredded', 'crushed',
+        'fresh', 'frozen', 'dried', 'ground', 'whole', 'cut', 'cubed', 'quartered', 'halved',
+        'peeled', 'unpeeled', 'seeded', 'cored', 'rinsed', 'drained', 'patted dry', 'wiped',
+        'unsalted', 'salted', 'low-sodium', 'reduced-sodium', 'full-fat', 'low-fat', 'fat-free',
+        'sweet', 'sour', 'bitter', 'spicy', 'hot', 'mild', 'extra',
+        'cold', 'warm', 'hot', 'room temperature', 'chilled',
+        'packed', 'heaping', 'lightly packed', 'loose', 'a', 'an', 'the', 'some',
+        'good quality', 'best quality', 'fine', 'coarse', 'superfine',
+        'a pinch of', 'a dash of', 'a sprinkle of', 'a couple of', 'toasted', 'roasted', 'cooked', 'raw', 'blanched',
+        'organic', 'farm-fresh', 'aged', 'filtered', 'divided', 'such as', 'plus more for garnish',
+        'or more', 'or less', 'about', 'approximately', 'small', 'medium', 'large', 'jumbo', 'extra large', 'tiny', 'baby',
+        'for serving', 'for garnish', 'as needed', 'to taste', 'optional'
+    ];
+
     // Helper to extract quantity, unit, and normalized name from an ingredient string
     function normalizeIngredientName(ingredientString) {
+        let original = ingredientString.toLowerCase().trim();
         let quantity = 0;
         let unit = '';
-        let name = ingredientString.toLowerCase().trim();
+        let name = original; // Default to original if nothing else matches
 
-        // Regex to broadly capture quantity, optional unit, and the rest.
-        // This is complex due to varied formats ("1 1/2 cups", "2 large", "a pinch")
-        const match = name.match(/^(?:(\d+(?:\.\d+)?|\d+\s*\d*\/\d+|\d+\/\d+)\s*)?((?:cup|cups|teaspoon|teaspoons|tsp|tsps|tablespoon|tablespoons|tbsp|tbsps|gram|grams|g|kilogram|kilograms|kg|milliliter|milliliters|ml|liter|liters|l|ounce|ounces|oz|pound|pounds|lb|pinch|dash|clove|cloves|stalk|stalks|sprig|sprigs|can|cans|package|packages|box|boxes|slice|slices|head|heads|leaf|leaves|sprinkle|container|containers|ea|each|piece|pieces|small|medium|large|jumbo|extra large|tiny|baby)\s*)?(.*)/i);
+        console.log(`--- Parsing "${original}" ---`);
 
-        if (match) {
-            let qtyStr = match[1] || '';
-            let unitStr = match[2] || '';
-            let ingredientName = match[3] || name; 
+        // 1. Extract Quantity
+        let remaining = original;
+        const qtyMatch = original.match(quantityRegex);
+        if (qtyMatch) {
+            let qtyStr = qtyMatch[1].trim();
+            remaining = original.substring(qtyMatch[0].length).trim();
 
-            // Parse quantity
-            if (qtyStr) {
+            if (qtyStr.includes('/')) { // Handle fractions and mixed numbers (e.g., "1 1/2" or "1/2")
                 const parts = qtyStr.split(' ').map(p => {
                     if (p.includes('/')) {
                         const [n, d] = p.split('/');
@@ -647,67 +721,82 @@
                 });
                 quantity = parts.reduce((sum, current) => sum + current, 0);
             } else {
-                // If no explicit quantity, assume 1 (e.g., "large onion")
-                quantity = 1;
+                quantity = parseFloat(qtyStr);
             }
-            
-            // Normalize unit (singularize and map common abbreviations)
-            if (unitStr) {
-                unit = unitStr.replace(/s$/, '').trim(); // Remove 's' for plural
-                const unitMap = {
-                    'tsp': 'teaspoon', 'tbsp': 'tablespoon', 'g': 'gram', 'kg': 'kilogram',
-                    'ml': 'milliliter', 'l': 'liter', 'oz': 'ounce', 'lb': 'pound', 'ea': 'each'
-                };
-                unit = unitMap[unit] || unit;
-            }
-
-            // Strip common descriptors from ingredientName
-            const descriptorsToStrip = [
-                'melted', 'softened', 'diced', 'chopped', 'sliced', 'minced', 'grated', 'shredded', 'crushed',
-                'fresh', 'frozen', 'dried', 'ground', 'whole', 'cut', 'cubed', 'quartered', 'halved',
-                'peeled', 'unpeeled', 'seeded', 'cored', 'rinsed', 'drained', 'pat dry', 'wiped',
-                'unsalted', 'salted', 'low-sodium', 'reduced-sodium', 'full-fat', 'low-fat', 'fat-free',
-                'sweet', 'sour', 'bitter', 'spicy', 'hot', 'mild', 'extra',
-                'cold', 'warm', 'hot', 'room temperature', 'chilled',
-                'packed', 'heaping', 'lightly packed', 'loose', 'a', 'an',
-                'good quality', 'best quality', 'fine', 'coarse', 'superfine',
-                'a pinch of', 'a dash of', 'a sprinkle of', 'a couple of', 'toasted', 'roasted', 'cooked', 'raw',
-                'organic', 'farm-fresh', 'aged', 'filtered', 'divided', 'such as', 'plus more for garnish'
-            ];
-            
-            descriptorsToStrip.forEach(desc => {
-                // Use regex with word boundaries to avoid partial matches
-                ingredientName = ingredientName.replace(new RegExp(`\\b${desc}\\b`, 'g'), '').trim();
-            });
-
-            // Remove extraneous spaces and punctuation (commas, periods)
-            ingredientName = ingredientName.replace(/[,.]/g, '').replace(/\s{2,}/g, ' ').trim();
-            
-            // Final singularization attempt for ingredient name. This is a heuristic.
-            if (ingredientName.length > 3 && ingredientName.endsWith('s') && !['molasses', 'asparagus', 'glass', 'oats', 'lenses'].includes(ingredientName)) {
-                 ingredientName = ingredientName.slice(0, -1);
-            }
-
-            // If the name is now empty after stripping, use the original full string
-            if (!ingredientName) ingredientName = name;
-
-            return {
-                quantity: quantity,
-                unit: unit,
-                name: ingredientName
-            };
+        } else {
+            // If no quantity is found, assume 1 (e.g., "large onion", "salt")
+            quantity = 1;
         }
-        // Fallback for ingredients that don't match the regex (e.g., just "Salt" or "Water")
-        return { quantity: 1, unit: '', name: ingredientString.toLowerCase().trim() };
+        console.log(`  Quantity: ${quantity}`);
+        console.log(`  Remaining after qty: "${remaining}"`);
+
+
+        // 2. Extract Unit
+        let foundUnit = false;
+        for (const u of Object.keys(unitMap)) {
+            // Match whole word, optionally followed by '.' or 'of '
+            const unitRegex = new RegExp(`^(${u})[s.]?(?:\\s+of\\b|\\b)?`, 'i');
+            const unitMatch = remaining.match(unitRegex);
+
+            if (unitMatch) {
+                unit = unitMap[u]; // Use normalized unit
+                remaining = remaining.substring(unitMatch[0].length).trim();
+                foundUnit = true;
+                break; // Found the unit, move on
+            }
+        }
+        console.log(`  Unit: "${unit}" (found: ${foundUnit})`);
+        console.log(`  Remaining after unit: "${remaining}"`);
+
+        // Now, `remaining` should be the raw ingredient name (plus descriptors)
+        name = remaining || original; // Fallback if remaining is empty
+
+        // 3. Strip common descriptors from the name
+        let cleanedName = name;
+        commonDescriptors.forEach(desc => {
+            // Use regex with word boundaries to avoid partial matches, case-insensitive
+            // Also handle cases like "salt, fine" -> "salt" by stripping from end
+            cleanedName = cleanedName.replace(new RegExp(`\\b${desc}\\b`, 'gi'), '').trim();
+        });
+
+        // Remove extraneous spaces, leading/trailing punctuation (except apostrophes)
+        cleanedName = cleanedName.replace(/^[,\s.]+/, '').replace(/[,\s.]+$/, '').replace(/\s{2,}/g, ' ').trim();
+        
+        // Final singularization heuristic for the ingredient name (not units)
+        // Avoid singularizing words like "glass", "molasses", "oats"
+        if (cleanedName.length > 3 && cleanedName.endsWith('s') && !['molasses', 'asparagus', 'oats'].includes(cleanedName)) {
+             cleanedName = cleanedName.slice(0, -1);
+        }
+
+        // If cleaning resulted in an empty string, fall back to something more recognizable
+        if (!cleanedName) {
+            cleanedName = name; // Use name before heavy stripping
+        }
+        if (!cleanedName) {
+            cleanedName = original; // Use original if all else fails
+        }
+        
+        // Ensure name starts with a letter or number if it's currently whitespace/punctuation
+        cleanedName = cleanedName.replace(/^[^a-z0-9]*/i, '').trim();
+        
+        console.log(`  Cleaned Name: "${cleanedName}"`);
+        console.log(`--- End Parsing ---`);
+
+        return {
+            quantity: quantity,
+            unit: unit,
+            name: cleanedName
+        };
     }
 
     // Helper for displaying fractions nicely
     function formatFraction(d) {
         if (typeof d !== 'number' || isNaN(d)) return "";
-        const tolerance = 0.005; 
+        const tolerance = 0.005; // Adjusted tolerance for better matching
         const whole = Math.floor(d);
         const rem = d - whole;
 
+        // Check for exact whole numbers
         if (Math.abs(rem) < tolerance) return Math.round(d).toString();
 
         const fracs = {
@@ -717,7 +806,7 @@
         };
         
         let closestFractionSymbol = "";
-        let minDiff = 1; 
+        let minDiff = 1; // Start with a larger difference
 
         for (let key in fracs) {
             const val = parseFloat(key);
@@ -727,13 +816,15 @@
             }
         }
 
-        if (closestFractionSymbol && minDiff < tolerance * 2) { 
+        if (closestFractionSymbol && minDiff < tolerance * 2) { // Use a slightly looser tolerance for selection than for whole numbers
             return whole > 0 ? `${whole} ${closestFractionSymbol}` : closestFractionSymbol;
         }
-        return d.toFixed(2).replace(/\.?0+$/, ''); 
+        // Fallback to 2 decimals if no good fraction match
+        return d.toFixed(2).replace(/\.?0+$/, ''); // Remove trailing .00 or .0
     }
 
     function renderShoppingList() {
+        console.log("Rendering shopping list...");
         const div = document.getElementById('shoppingListContainer');
         div.innerHTML = '';
         const week = document.getElementById('mealPlanWeekSelect').value;
@@ -756,9 +847,11 @@
         allIngredientsRaw.forEach(line => {
             const parsed = normalizeIngredientName(line);
 
-            // Create a consistent aggregation key
-            // Use 'name (unit)' if unit exists, else just 'name'
-            const aggKey = (parsed.name + (parsed.unit ? ` (${parsed.unit})` : '')).trim();
+            // Create a consistent aggregation key: "name (unit)" or just "name" if no unit
+            let aggKey = parsed.name;
+            if (parsed.unit) {
+                aggKey += ` (${parsed.unit})`;
+            }
 
             if (!aggregatedIngredients[aggKey]) {
                 aggregatedIngredients[aggKey] = { quantity: 0, unit: parsed.unit, name: parsed.name };
@@ -776,17 +869,21 @@
 
             // Decide how to display: "1 cup flour", "2 eggs", "salt"
             if (item.unit && item.name) {
+                // Example: "1 cup butter"
                 displayText = `${displayQuantity} ${item.unit} ${item.name}`;
-            } else if (item.name && item.quantity > 0) { // e.g., "2 large onion"
+            } else if (item.name && item.quantity > 0 && !isNaN(item.quantity)) { 
+                // Example: "2 onion" (where unit couldn't be parsed but quantity was)
+                // Or just "salt" if quantity is 1 and no unit
                 displayText = `${displayQuantity} ${item.name}`;
-            } else { // Fallback, e.g., "salt" where no quantity or unit was easily parsed
-                displayText = item.name;
+            } else { // Fallback, e.g., "salt" or original string if parsing failed significantly
+                displayText = item.name || "Unknown Item"; // Use cleaned name or a fallback
             }
             
             d.innerHTML = `<input type="checkbox"><span>${displayText}</span>`;
             d.querySelector('input').onclick = (e) => e.target.checked ? d.classList.add('checked') : d.classList.remove('checked');
             div.appendChild(d);
         });
+        console.log("Shopping list rendered.");
     }
 
 
@@ -823,7 +920,13 @@
 
             await loadRecipes(); 
             // Re-render the current active view
-            showView(document.querySelector('.view-toggle button.active').id.replace('view','').toLowerCase().replace('btn','')); 
+            const activeViewBtn = document.querySelector('.view-toggle button.active');
+            if (activeViewBtn) {
+                const viewName = activeViewBtn.id.replace('view','').toLowerCase().replace('btn','');
+                showView(viewName);
+            } else {
+                showView('recipes'); // Fallback
+            }
         } catch (e) { alert("Error deleting recipe."); console.error(e); }
     }
 
@@ -873,7 +976,7 @@
         } else srcLink.style.display = 'none';
 
         updateStars(document.getElementById('detRating'), r.rating || 0);
-        renderIngredients(r, 1);
+        renderIngredientsInDetail(r, 1);
 
         // Instructions
         const div = document.getElementById('detInstructions'); div.innerHTML='';
@@ -887,7 +990,7 @@
         //requestWakeLock(); // Removed wakeLock as it's not strictly necessary for viewing
     }
 
-    function renderIngredients(r, scale) {
+    function renderIngredientsInDetail(r, scale) {
         const list = document.getElementById('detIngredients');
         list.innerHTML = '';
         
@@ -895,16 +998,20 @@
             const li = document.createElement('li');
             li.onclick = () => li.classList.toggle('checked');
             
-            // Re-use the smart parsing logic for display as well
             const parsed = normalizeIngredientName(ing);
             let displayText;
 
+            // Use parsed info to display. Combine quantity, unit, and name.
+            let scaledQuantity = parsed.quantity * scale;
+
             if (parsed.unit && parsed.name) {
-                displayText = `${formatFraction(parsed.quantity * scale)} ${parsed.unit} ${parsed.name}`;
-            } else if (parsed.name && parsed.quantity > 0) { // e.g., "2 large onion"
-                displayText = `${formatFraction(parsed.quantity * scale)} ${parsed.name}`;
-            } else { // Fallback, e.g., "salt" where no quantity or unit was easily parsed
-                displayText = ing; // Display original string
+                displayText = `${formatFraction(scaledQuantity)} ${parsed.unit} ${parsed.name}`;
+            } else if (parsed.name && parsed.quantity > 0 && !isNaN(scaledQuantity)) {
+                // If no unit, but quantity and name present (e.g., "2 large onion" scaled)
+                displayText = `${formatFraction(scaledQuantity)} ${parsed.name}`;
+            } else {
+                // Fallback to original if parsing was minimal or quantity was zero/NaN
+                displayText = ing; 
             }
             li.textContent = displayText;
             list.appendChild(li);
@@ -962,6 +1069,7 @@
         document.getElementById(`view${v.charAt(0).toUpperCase()+v.slice(1)}Btn`).onclick = () => showView(v);
     });
     function showView(v) {
+        console.log(`Showing view: ${v}`);
         document.querySelectorAll('.view-toggle button').forEach(b=>b.classList.remove('active'));
         document.getElementById(`view${v.charAt(0).toUpperCase()+v.slice(1)}Btn`).classList.add('active');
         ['recipes','mealPlan','shopping','favorites'].forEach(x=>document.getElementById(`${x}View`).style.display='none');
@@ -1063,7 +1171,7 @@
     // Servings Scaling
     document.getElementById('detDesiredServings').oninput = (e) => {
         const r = recipes.find(x=>x.id===activeRecipeId);
-        if(r) renderIngredients(r, parseFloat(e.target.value)/parseFloat(r.originalServings));
+        if(r) renderIngredientsInDetail(r, parseFloat(e.target.value)/parseFloat(r.originalServings));
     };
 
     // Notes Autosave

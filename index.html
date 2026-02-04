@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Beckner Recipes</title>
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2c3e50">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3565/3565418.png">
+
     <!-- Compressor.js for client-side image resizing -->
     <script src="https://cdn.jsdelivr.net/npm/compressorjs@1.2.1/dist/compressor.min.js"></script>
     <style>
@@ -88,6 +93,7 @@
             justify-content: center;
             gap: 10px;
             margin-bottom: 20px;
+            flex-wrap: wrap;
         }
         
         /* Buttons & Inputs */
@@ -223,6 +229,39 @@
             display: flex; align-items: center; justify-content: center;
             font-size: 12px; border: none;
         }
+
+        /* --- SHOPPING LIST --- */
+        .shopping-list-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+        }
+        .shopping-item {
+            display: flex;
+            align-items: flex-start;
+            background: var(--card-bg);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        .shopping-item input[type="checkbox"] {
+            width: 20px; height: 20px; margin-right: 10px; margin-top: 2px;
+        }
+        .shopping-item.checked span {
+            text-decoration: line-through; opacity: 0.6;
+        }
+
+        /* --- NUTRITION --- */
+        .nutrition-grid {
+            display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; margin-bottom: 15px;
+        }
+        .nutri-pill {
+            text-align: center;
+            background: var(--bg-color);
+            padding: 8px; border-radius: 6px; border: 1px solid var(--border-color);
+        }
+        .nutri-pill span { display: block; font-size: 0.8rem; opacity: 0.8; }
+        .nutri-pill strong { font-size: 1.1rem; color: var(--button-primary); }
 
         /* --- MODALS --- */
         .modal-overlay {
@@ -363,6 +402,7 @@
     <div class="view-toggle">
         <button id="viewRecipesBtn" class="active">Recipes</button>
         <button id="viewMealPlanBtn">Meal Plan</button>
+        <button id="viewShoppingBtn">Shopping List</button>
         <button id="viewFavoritesBtn">Favorites</button>
     </div>
 
@@ -389,6 +429,13 @@
             </select>
         </div>
         <div id="mealPlanGrid" class="meal-plan-calendar"></div>
+    </div>
+
+    <div id="shoppingView" style="display: none;">
+        <div style="padding:15px; background:var(--card-bg); border-radius:8px; margin-bottom:15px;">
+            <p style="margin:0;">Generates a list based on your Meal Plan selection.</p>
+        </div>
+        <div id="shoppingListContainer" class="shopping-list-container"></div>
     </div>
 
     <div id="favoritesView" style="display: none;">
@@ -421,7 +468,16 @@
                 <button type="button" id="btnAddCat" class="primary-btn">Add</button>
             </div>
 
-            <div style="display:flex; gap:10px; align-items: center; margin-bottom:10px;">
+            <!-- NUTRITION INPUTS -->
+            <label style="margin-top:10px; display:block; font-weight:bold;">Nutrition (Optional)</label>
+            <div style="display:flex; gap:10px; margin-bottom:10px;">
+                <input type="number" id="inpCal" placeholder="Cals" style="margin:0;">
+                <input type="number" id="inpPro" placeholder="Prot (g)" style="margin:0;">
+                <input type="number" id="inpCarb" placeholder="Carbs (g)" style="margin:0;">
+                <input type="number" id="inpFat" placeholder="Fat (g)" style="margin:0;">
+            </div>
+
+            <div style="display:flex; gap:10px; align-items: center; margin-bottom:10px; margin-top:10px;">
                 <input type="number" id="inpServings" placeholder="Servings" value="4" style="width:100px;">
                 <div class="stars" id="inpRating" data-val="0">
                     <span data-v="1">★</span><span data-v="2">★</span><span data-v="3">★</span><span data-v="4">★</span><span data-v="5">★</span>
@@ -465,6 +521,14 @@
         <div class="split-view-container">
             <!-- LEFT COLUMN: INGREDIENTS & TOOLS -->
             <div class="split-col left">
+                <!-- NUTRITION BADGES -->
+                <div id="detNutrition" class="nutrition-grid" style="display:none;">
+                    <div class="nutri-pill"><span>Calories</span><strong id="valCal">0</strong></div>
+                    <div class="nutri-pill"><span>Protein</span><strong id="valPro">0g</strong></div>
+                    <div class="nutri-pill"><span>Carbs</span><strong id="valCarb">0g</strong></div>
+                    <div class="nutri-pill"><span>Fat</span><strong id="valFat">0g</strong></div>
+                </div>
+
                 <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-color); border-radius: 8px;">
                     <label style="font-size:0.85rem; font-weight:bold;">Yields: <span id="detOrigServings"></span></label>
                     <div style="display:flex; align-items:center; gap:5px; margin-top:5px;">
@@ -512,6 +576,15 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
     import { getStorage, ref, uploadString, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
+
+    // PWA Service Worker Registration
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js')
+                .then(reg => console.log('Service Worker registered', reg))
+                .catch(err => console.log('Service Worker failed', err));
+        });
+    }
 
     const firebaseConfig = {
         apiKey: "AIzaSyA_5czSGHpYR8ZHMuB41mnIf5gL8zvLS6M",
@@ -593,7 +666,7 @@
             console.log("Global data loaded successfully.");
 
         } catch(e) { 
-            console.error("Global data load error. Possibly first run or network issue. Ensure Firestore rules allow 'read' for 'appData' collection.", e);
+            console.error("Global data load error. Possibly first run or network issue.", e);
             favorites = [];
             mealPlan = {};
             categories = ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks'].sort();
@@ -603,34 +676,31 @@
     async function saveGlobalFavorites() {
         try {
             await setDoc(appDataDocFavs, { ids: favorites });
-            console.log("Favorites saved to Cloud.");
             if(document.getElementById('viewFavoritesBtn').classList.contains('active')) renderFavoritesList();
             renderRecipeList();
-        } catch(e) { console.error("Failed to save favorites to Cloud. Check Firebase Firestore rules:", e); }
+        } catch(e) { console.error("Failed to save favorites:", e); }
     }
 
     async function saveGlobalMealPlan() {
         try {
             await setDoc(appDataDocPlan, { plan: mealPlan });
-            console.log("Meal Plan saved to Cloud.");
             renderMealPlanGrid();
-        } catch(e) { console.error("Failed to save meal plan to Cloud. Check Firebase Firestore rules:", e); }
+        } catch(e) { console.error("Failed to save meal plan:", e); }
     }
 
     async function saveGlobalCategories() {
         try {
             await setDoc(appDataDocCats, { list: categories });
-            console.log("Categories saved to Cloud.");
             renderCategories();
-        } catch(e) { console.error("Failed to save categories to Cloud. Check Firebase Firestore rules:", e); }
+        } catch(e) { console.error("Failed to save categories:", e); }
     }
 
     async function loadRecipes() {
         try {
             const snap = await getDocs(recipesCollection);
             recipes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            console.log(`Successfully loaded ${recipes.length} recipes from Cloud.`);
-        } catch(e) { console.error("Failed to load recipes from Cloud. Check Firebase Firestore rules for 'recipes' collection:", e); }
+            console.log(`Successfully loaded ${recipes.length} recipes.`);
+        } catch(e) { console.error("Failed to load recipes:", e); }
     }
 
     // --- UI RENDERING ---
@@ -638,7 +708,6 @@
     function renderCategories() {
         const sel = document.getElementById('categoryFilter');
         const inp = document.getElementById('inpCategory');
-        
         const currentFilterValue = sel.value; 
         
         sel.innerHTML = '<option value="all">All Categories</option>';
@@ -649,11 +718,7 @@
             inp.add(new Option(c, c));
         });
         
-        if (Array.from(sel.options).some(option => option.value === currentFilterValue)) {
-            sel.value = currentFilterValue;
-        } else {
-            sel.value = 'all';
-        }
+        sel.value = Array.from(sel.options).some(o => o.value === currentFilterValue) ? currentFilterValue : 'all';
     }
 
     function renderRecipeList() {
@@ -678,7 +743,6 @@
         const container = document.getElementById('favoritesList');
         container.innerHTML = '';
         const list = recipes.filter(r => favorites.includes(r.id));
-        
         document.getElementById('emptyFavMessage').style.display = list.length ? 'none' : 'block';
         list.forEach(r => container.appendChild(createRecipeCard(r)));
     }
@@ -708,14 +772,117 @@
         div.addEventListener('dragstart', (e) => {
             e.dataTransfer.setData('text/plain', r.id);
             e.dataTransfer.effectAllowed = 'copyMove';
-            // Mark the source of the drag if coming from a recipe card in the main list
             e.dataTransfer.setData('application/json', JSON.stringify({ source: 'recipe-list' }));
         });
 
         return div;
     }
 
-    // --- MEAL PLAN ---
+    // --- MEAL PLAN & SHOPPING LIST ---
+    
+    function renderShoppingList() {
+        const container = document.getElementById('shoppingListContainer');
+        container.innerHTML = '';
+        
+        const week = document.getElementById('mealPlanWeekSelect').value;
+        const allIngredients = [];
+
+        // 1. Gather all ingredients from the selected week's meal plan
+        Object.keys(mealPlan).forEach(key => {
+            if (key.startsWith(week + '-')) {
+                const recipeIds = mealPlan[key];
+                recipeIds.forEach(rid => {
+                    const r = recipes.find(rec => rec.id === rid);
+                    if(r && r.ingredients) {
+                        allIngredients.push(...r.ingredients);
+                    }
+                });
+            }
+        });
+
+        if (allIngredients.length === 0) {
+            container.innerHTML = '<p>Meal plan is empty for this week.</p>';
+            return;
+        }
+
+        // 2. Simple aggregation (Grouping by text after first number)
+        // This attempts to combine "1 cup flour" and "2 cups flour"
+        const aggregated = {};
+
+        allIngredients.forEach(raw => {
+            // Regex to find: (Number/Fraction) (Everything Else)
+            // Matches: "1.5 cup flour", "1/2 tsp salt", "1 large onion"
+            const match = raw.match(/^([\d\/\.\s]+)(.*)/);
+            
+            if (match) {
+                // Try to parse the number
+                let qtyStr = match[1].trim();
+                let itemStr = match[2].trim().toLowerCase();
+                
+                // Handle fractions manually
+                let val = 0;
+                if(qtyStr.includes('/')) {
+                    const parts = qtyStr.split(' ');
+                    parts.forEach(p => {
+                        if(p.includes('/')) {
+                            const [n,d] = p.split('/');
+                            val += (parseFloat(n)/parseFloat(d));
+                        } else {
+                            val += parseFloat(p);
+                        }
+                    });
+                } else {
+                    val = parseFloat(qtyStr);
+                }
+
+                if (isNaN(val)) val = 0;
+
+                // Normalize item string to help grouping (singularize simply)
+                // Very basic normalization: remove trailing 's' if > 3 chars
+                let normalizedKey = itemStr;
+                if(normalizedKey.endsWith('s') && normalizedKey.length > 3) {
+                     normalizedKey = normalizedKey.slice(0, -1);
+                }
+
+                if (!aggregated[normalizedKey]) {
+                    aggregated[normalizedKey] = { val: 0, originalName: itemStr };
+                }
+                aggregated[normalizedKey].val += val;
+
+            } else {
+                // No number found, just add as is
+                if (!aggregated[raw]) aggregated[raw] = { val: 0, originalName: raw, isRaw: true };
+                else aggregated[raw].val += 1;
+            }
+        });
+
+        // 3. Render
+        Object.values(aggregated).sort((a,b) => a.originalName.localeCompare(b.originalName)).forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'shopping-item';
+            
+            let text = "";
+            if (item.isRaw) {
+                text = item.originalName;
+            } else {
+                // Use formatFraction logic
+                text = `${formatFraction(item.val)} ${item.originalName}`;
+            }
+
+            div.innerHTML = `
+                <input type="checkbox">
+                <span>${text}</span>
+            `;
+            
+            div.querySelector('input').onclick = (e) => {
+                if(e.target.checked) div.classList.add('checked');
+                else div.classList.remove('checked');
+            };
+            
+            container.appendChild(div);
+        });
+    }
+
     function renderMealPlanGrid() {
         const grid = document.getElementById('mealPlanGrid');
         grid.innerHTML = '';
@@ -735,107 +902,28 @@
             const content = document.createElement('div');
             content.className = 'day-content';
             
-            // Drag and Drop Listeners for meal plan day content area
+            // Drag and Drop Listeners
             content.addEventListener('dragover', (e) => {
                 e.preventDefault(); 
                 e.dataTransfer.dropEffect = 'move';
                 col.classList.add('drag-over');
-
-                // Visual insertion point
-                const draggable = document.querySelector('.meal-card.dragging'); // Get the dragged item (if internal)
-                if (draggable && content.contains(draggable)) { // If dragging within the same day
-                    const afterElement = getDragAfterElement(content, e.clientY);
-                    if (afterElement == null) {
-                        content.appendChild(draggable);
-                    } else {
-                        content.insertBefore(draggable, afterElement);
-                    }
-                }
             });
-            content.addEventListener('dragleave', () => {
-                col.classList.remove('drag-over');
-            });
+            content.addEventListener('dragleave', () => col.classList.remove('drag-over'));
             content.addEventListener('drop', (e) => {
                 e.preventDefault();
                 col.classList.remove('drag-over');
-                
                 const recipeId = e.dataTransfer.getData('text/plain');
-                const dragSourceData = e.dataTransfer.getData('application/json');
-                const sourceInfo = dragSourceData ? JSON.parse(dragSourceData) : {};
-                
                 const targetDayKey = `${week}-${day.toLowerCase()}`;
                 
-                if (sourceInfo.source === 'meal-plan-card') { // Dragging from another meal plan card
-                    const sourceDayKey = sourceInfo.dayKey;
-                    const sourceRecipeId = sourceInfo.recipeId;
-
-                    if (sourceDayKey === targetDayKey) { // Reordering within the same day
-                        // Logic for reordering already handled by dragover, just need to save
-                        const reorderedIds = Array.from(content.children)
-                                            .filter(el => el.classList.contains('meal-card'))
-                                            .map(el => el.dataset.recipeId);
-                        mealPlan[targetDayKey] = reorderedIds;
-                        console.log(`Reordered ${sourceRecipeId} within ${targetDayKey}`);
-                    } else { // Moving between different days
-                        // Remove from source day
-                        mealPlan[sourceDayKey] = mealPlan[sourceDayKey].filter(id => id !== sourceRecipeId);
-                        // Add to target day at correct position
-                        const reorderedIds = Array.from(content.children)
-                                            .filter(el => el.classList.contains('meal-card'))
-                                            .map(el => el.dataset.recipeId);
-                        
-                        // Ensure the dropped item is now part of the content before mapping
-                        const draggedEl = document.querySelector('.meal-card.dragging');
-                        if (draggedEl && draggedEl.dataset.recipeId === sourceRecipeId) {
-                            if (!reorderedIds.includes(sourceRecipeId)) { // If not already in the target, add it
-                                const afterElement = getDragAfterElement(content, e.clientY);
-                                if (afterElement == null) {
-                                    content.appendChild(draggedEl);
-                                } else {
-                                    content.insertBefore(draggedEl, afterElement);
-                                }
-                                mealPlan[targetDayKey] = Array.from(content.children)
-                                                            .filter(el => el.classList.contains('meal-card'))
-                                                            .map(el => el.dataset.recipeId);
-                            }
-                        } else {
-                             // Fallback if dragged element not found, just append
-                             mealPlan[targetDayKey] = [...(mealPlan[targetDayKey] || []), sourceRecipeId];
-                        }
-                        
-                        console.log(`Moved ${sourceRecipeId} from ${sourceDayKey} to ${targetDayKey}`);
-                    }
-                } else { // Dragging from main recipe list
-                    if (recipeId) {
-                        if (mealPlan[targetDayKey] && mealPlan[targetDayKey].includes(recipeId)) {
-                            console.log("Recipe already on this day's plan.");
-                            alert("Recipe already on this day's plan.");
-                        } else {
-                            // Add to target day at correct position
-                            const reorderedIds = Array.from(content.children)
-                                                .filter(el => el.classList.contains('meal-card'))
-                                                .map(el => el.dataset.recipeId);
-
-                            const newMealCardEl = createMealCardElement(recipes.find(r => r.id === recipeId), targetDayKey); // Create new card element
-                            const afterElement = getDragAfterElement(content, e.clientY);
-                            if (afterElement == null) {
-                                content.appendChild(newMealCardEl);
-                            } else {
-                                content.insertBefore(newMealCardEl, afterElement);
-                            }
-                            mealPlan[targetDayKey] = Array.from(content.children)
-                                                        .filter(el => el.classList.contains('meal-card'))
-                                                        .map(el => el.dataset.recipeId);
-                            console.log(`Added ${recipeId} to ${targetDayKey}`);
-                            alert("Added to Meal Plan!");
-                        }
+                // Logic to move or add
+                if (recipeId) {
+                    if (mealPlan[targetDayKey] && mealPlan[targetDayKey].includes(recipeId)) {
+                        alert("Recipe already on this day's plan.");
+                    } else {
+                        mealPlan[targetDayKey] = [...(mealPlan[targetDayKey] || []), recipeId];
+                        saveGlobalMealPlan();
                     }
                 }
-                
-                // Clear any dragging classes
-                document.querySelectorAll('.meal-card.dragging').forEach(el => el.classList.remove('dragging'));
-
-                saveGlobalMealPlan(); // Save changes to Firebase
             });
 
             const key = `${week}-${day.toLowerCase()}`;
@@ -850,12 +938,11 @@
         });
     }
 
-    // Helper to create a meal card element (used by renderMealPlanGrid and drag-and-drop)
     function createMealCardElement(r, dayKey) {
         const card = document.createElement('div');
         card.className = 'meal-card';
-        card.draggable = true; // Make meal cards draggable
-        card.dataset.recipeId = r.id; // Store recipe ID
+        card.draggable = true;
+        card.dataset.recipeId = r.id;
         
         const img = r.imageData || 'https://via.placeholder.com/150x90?text=Food';
         card.innerHTML = `
@@ -869,42 +956,22 @@
             saveGlobalMealPlan();
         };
         card.onclick = () => openDetail(r);
-
+        
         card.addEventListener('dragstart', (e) => {
-            e.dataTransfer.setData('text/plain', r.id); // For recipe ID
-            e.dataTransfer.effectAllowed = 'move';
-            // Also store source info for internal meal plan moves
-            e.dataTransfer.setData('application/json', JSON.stringify({ source: 'meal-plan-card', recipeId: r.id, dayKey: dayKey }));
-            e.target.classList.add('dragging'); // Add class to the dragged item
+            e.dataTransfer.setData('text/plain', r.id);
+            e.target.classList.add('dragging');
         });
-        card.addEventListener('dragend', (e) => {
-            e.target.classList.remove('dragging'); // Remove class when drag ends
-        });
+        card.addEventListener('dragend', (e) => e.target.classList.remove('dragging'));
 
         return card;
     }
-
-    // Helper to find the element after which the dragged item should be inserted
-    function getDragAfterElement(container, y) {
-        const draggableElements = [...container.querySelectorAll('.meal-card:not(.dragging)')];
-        return draggableElements.reduce((closest, child) => {
-            const box = child.getBoundingClientRect();
-            const offset = y - box.top - box.height / 2;
-            if (offset < 0 && offset > closest.offset) {
-                return { offset: offset, element: child };
-            } else {
-                return closest;
-            }
-        }, { offset: -Infinity }).element;
-    }
-
 
     async function addToMealPlanFromDetail(dayKey, recipeId) {
         const week = document.getElementById('mealPlanWeekSelect').value || 'current';
         const key = `${week}-${dayKey}`;
         
         if(!mealPlan[key]) mealPlan[key] = [];
-        if(!mealPlan[key].includes(recipeId)) { // Prevent duplicates
+        if(!mealPlan[key].includes(recipeId)) { 
             mealPlan[key].push(recipeId);
             await saveGlobalMealPlan();
             alert("Added to Meal Plan!"); 
@@ -922,33 +989,14 @@
 
     async function deleteRecipe(id) {
         if(!confirm("Permanently delete this recipe?")) return;
-        
         const recipeToDelete = recipes.find(r => r.id === id);
-        
         try {
-            console.log("Starting recipe deletion process.");
-            // Attempt to delete image from storage if it exists
-            if (recipeToDelete && recipeToDelete.imageData) {
-                if (recipeToDelete.imageData.startsWith('https://firebasestorage.googleapis.com/')) {
-                    try {
-                        console.log("Attempting to delete image from Storage...");
-                        const oldImageRef = ref(storage, recipeToDelete.imageData);
-                        await deleteObject(oldImageRef);
-                        console.log("Image deleted from Storage."); 
-                    } catch (err) {
-                        console.warn("Could not delete image from Storage:", err);
-                    }
-                }
+            if (recipeToDelete && recipeToDelete.imageData && recipeToDelete.imageData.startsWith('https://firebasestorage.googleapis.com/')) {
+                try { await deleteObject(ref(storage, recipeToDelete.imageData)); } catch (err) {}
             }
-
-            // Delete Firestore Document
-            console.log("Attempting to delete recipe from Firestore...");
             await deleteDoc(doc(db, 'recipes', id));
-            console.log("Recipe deleted from Firestore."); 
-
-            // Cleanup from global lists (local state only, then save)
-            if(favorites.includes(id)) { favorites = favorites.filter(x => x !== id); await saveGlobalFavorites(); }
             
+            if(favorites.includes(id)) { favorites = favorites.filter(x => x !== id); await saveGlobalFavorites(); }
             let changed = false;
             Object.keys(mealPlan).forEach(k => {
                 if(mealPlan[k].includes(id)) {
@@ -961,10 +1009,7 @@
 
             await loadRecipes(); 
             showView(document.querySelector('.view-toggle button.active').id.replace('view','').toLowerCase().replace('btn','')); 
-        } catch (e) {
-            alert(`Failed to delete recipe. Error: ${e.message || "Unknown error"}.`);
-            console.error("Error deleting recipe:", e);
-        }
+        } catch (e) { alert("Error deleting recipe."); console.error(e); }
     }
 
     async function saveRecipe(data) {
@@ -975,34 +1020,22 @@
             let imageUrl = null; 
             const editId = data.id; 
 
-            // --- IMAGE UPLOAD LOGIC ---
             if (currentImageFile) { 
-                console.log("Image file detected. Attempting to upload to Storage...");
                 const imageId = `recipe-${(window.crypto || crypto).randomUUID()}`; 
                 const storageRef = ref(storage, `recipe_images/${imageId}`);
-                
                 try {
                     const snapshot = await uploadString(storageRef, currentImageFile, 'data_url');
                     imageUrl = await getDownloadURL(snapshot.ref);
-                    console.log("Image successfully uploaded to Storage! URL: " + imageUrl);
                     
                     if (editId) {
                         const oldRecipe = recipes.find(r => r.id === editId);
                         if (oldRecipe && oldRecipe.imageData && oldRecipe.imageData.startsWith('https://firebasestorage.googleapis.com/')) {
-                            try {
-                                const oldImageRef = ref(storage, oldRecipe.imageData);
-                                await deleteObject(oldImageRef);
-                                console.log("Old image deleted from Storage.");
-                            } catch (err) {
-                                console.warn("Could not delete old image from Storage:", err);
-                            }
+                            try { await deleteObject(ref(storage, oldRecipe.imageData)); } catch (err) {}
                         }
                     }
                 } catch (imgError) {
-                    alert(`Image upload failed: ${imgError.message}. Check Firebase Storage rules.`);
-                    console.error("Image upload failed:", imgError);
-                    btn.textContent = "Save Recipe"; btn.disabled = false;
-                    return; 
+                    alert("Image upload failed.");
+                    btn.disabled = false; return; 
                 }
             } else if (editId) {
                 const oldRecipe = recipes.find(r => r.id === editId);
@@ -1010,23 +1043,16 @@
             }
             data.imageData = imageUrl; 
 
-            // --- FIRESTORE SAVE LOGIC ---
-            console.log("Attempting to save recipe data to Firestore...");
-            if(editId) {
-                await updateDoc(doc(db, 'recipes', editId), data);
-                console.log("Recipe successfully updated in Firestore!");
-            } else {
-                await addDoc(recipesCollection, data);
-                console.log("New recipe successfully added to Firestore!");
-            }
+            if(editId) await updateDoc(doc(db, 'recipes', editId), data);
+            else await addDoc(recipesCollection, data);
             
             await loadRecipes(); 
-            showView(document.querySelector('.view-toggle button.active').id.replace('view','').toLowerCase().replace('btn','')); 
+            showView('recipes');
             closeModals();
 
         } catch(error) {
-            alert(`Recipe save failed: ${error.message}. Check Firebase rules and console for details.`); 
-            console.error("Critical error during save process:", error);
+            alert("Recipe save failed: " + error.message); 
+            console.error(error);
         } finally {
             btn.textContent = "Save Recipe"; btn.disabled = false;
         }
@@ -1048,10 +1074,21 @@
         document.getElementById('detNotes').value = r.notes || '';
         document.getElementById('detPlanDay').value = "";
         
+        // Nutrition Display
+        const nGrid = document.getElementById('detNutrition');
+        if(r.nutrition && (r.nutrition.cal || r.nutrition.pro || r.nutrition.carb || r.nutrition.fat)) {
+            nGrid.style.display = 'grid';
+            document.getElementById('valCal').textContent = r.nutrition.cal || 0;
+            document.getElementById('valPro').textContent = (r.nutrition.pro || 0) + 'g';
+            document.getElementById('valCarb').textContent = (r.nutrition.carb || 0) + 'g';
+            document.getElementById('valFat').textContent = (r.nutrition.fat || 0) + 'g';
+        } else {
+            nGrid.style.display = 'none';
+        }
+
         const srcLink = document.getElementById('detSourceLink');
         if(r.source && r.source.trim() !== '') {
-            srcLink.href = r.source;
-            srcLink.style.display = 'block';
+            srcLink.href = r.source; srcLink.style.display = 'block';
         } else {
             srcLink.style.display = 'none';
         }
@@ -1071,7 +1108,10 @@
                 let duration = parseInt(match[1]);
                 if (match[2].startsWith('h')) duration *= 60; 
                 const btn = document.createElement('button');
-                btn.className = 'timer-btn primary-btn'; 
+                btn.className = 'primary-btn'; 
+                btn.style.marginLeft = '10px';
+                btn.style.padding = '2px 8px';
+                btn.style.fontSize = '0.8rem';
                 btn.textContent = `Start ${match[1]}${match[2].startsWith('m')?'m':'h'} Timer`;
                 btn.onclick = () => runTimer(duration, `Step ${index+1}`);
                 p.appendChild(btn);
@@ -1083,6 +1123,44 @@
         requestWakeLock(); 
     }
 
+    // --- BETTER MATH (Fractions) ---
+    function formatFraction(decimal) {
+        if (!decimal) return "";
+        const tolerance = 0.01;
+        
+        // Check for whole numbers
+        if (Math.abs(Math.round(decimal) - decimal) < tolerance) {
+            return Math.round(decimal).toString();
+        }
+
+        // Common fractions map
+        const fractions = {
+            0.125: "⅛", 0.25: "¼", 0.33: "⅓", 0.333: "⅓",
+            0.5: "½", 0.66: "⅔", 0.666: "⅔", 0.75: "¾", 0.875: "⅞"
+        };
+
+        const whole = Math.floor(decimal);
+        const remainder = decimal - whole;
+
+        // Find closest fraction
+        let closestFraction = "";
+        let minDiff = tolerance;
+
+        for (let [val, symbol] of Object.entries(fractions)) {
+            if (Math.abs(parseFloat(val) - remainder) < minDiff) {
+                closestFraction = symbol;
+                minDiff = Math.abs(parseFloat(val) - remainder);
+            }
+        }
+
+        if (closestFraction) {
+            return whole > 0 ? `${whole} ${closestFraction}` : closestFraction;
+        }
+
+        // Fallback to 2 decimals
+        return decimal.toFixed(2).replace(/\.00$/, '');
+    }
+
     function renderIngredients(r, scale) {
         const list = document.getElementById('detIngredients');
         list.innerHTML = '';
@@ -1091,51 +1169,33 @@
             const li = document.createElement('li');
             li.onclick = () => li.classList.toggle('checked');
             
-            const match = ing.match(/^(\d+(\.\d+)?|\d+\/\d+)\s*(.*)/);
+            const match = ing.match(/^([\d\/\.\s]+)(.*)/);
             if(match) {
-                let qty = match[1].includes('/') ? (parseInt(match[1].split('/')[0]) / parseInt(match[1].split('/')[1])) : parseFloat(match[1]);
-                let rest = match[3];
-                const final = (qty * scale); 
-                
-                let displayQty;
-                if (Number.isInteger(final)) {
-                    displayQty = final;
-                } else if (final % 1 === 0.5) { 
-                    displayQty = final;
-                } else if (Math.abs(final - Math.round(final)) < 0.01) { 
-                     displayQty = Math.round(final);
-                } else if (Math.abs(final - (Math.floor(final) + 1/3)) < 0.01 || Math.abs(final - (Math.floor(final) + 0.33)) < 0.01) {
-                    displayQty = Math.floor(final) + (Math.round((final - Math.floor(final)) * 3)/3); 
-                } else if (Math.abs(final - (Math.floor(final) + 2/3)) < 0.01 || Math.abs(final - (Math.floor(final) + 0.67)) < 0.01) {
-                    displayQty = Math.floor(final) + (Math.round((final - Math.floor(final)) * 3)/3); 
-                }
-                else {
-                    displayQty = final.toFixed(2);
+                let qtyStr = match[1].trim();
+                let rest = match[2];
+                let val = 0;
+
+                // Handle mixed fractions e.g. "1 1/2" or "1.5"
+                if(qtyStr.includes('/')) {
+                    const parts = qtyStr.split(' ');
+                    parts.forEach(p => {
+                        if(p.includes('/')) {
+                            const [n,d] = p.split('/');
+                            val += (parseFloat(n)/parseFloat(d));
+                        } else {
+                            val += parseFloat(p);
+                        }
+                    });
+                } else {
+                    val = parseFloat(qtyStr);
                 }
 
-                if (String(displayQty).includes('.')) {
-                    const decimalPart = displayQty - Math.floor(displayQty);
-                    let fraction = '';
-                    if (decimalPart > 0.33 - 0.01 && decimalPart < 0.33 + 0.01) fraction = '1/3';
-                    else if (decimalPart > 0.67 - 0.01 && decimalPart < 0.67 + 0.01) fraction = '2/3';
-                    else if (decimalPart > 0.25 - 0.01 && decimalPart < 0.25 + 0.01) fraction = '1/4';
-                    else if (decimalPart > 0.75 - 0.01 && decimalPart < 0.75 + 0.01) fraction = '3/4';
-                    else if (decimalPart > 0.125 - 0.01 && decimalPart < 0.125 + 0.01) fraction = '1/8';
-                    else if (decimalPart > 0.375 - 0.01 && decimalPart < 0.375 + 0.01) fraction = '3/8';
-                    else if (decimalPart > 0.625 - 0.01 && decimalPart < 0.625 + 0.01) fraction = '5/8';
-                    else if (decimalPart > 0.875 - 0.01 && decimalPart < 0.875 + 0.01) fraction = '7/8';
-                    else if (decimalPart > 0.5 - 0.01 && decimalPart < 0.5 + 0.01) fraction = '1/2';
-
-                    if (fraction) {
-                        displayQty = Math.floor(displayQty) || '';
-                        if (displayQty) displayQty = `${displayQty} `;
-                        displayQty = `${displayQty}${fraction}`;
-                    } else {
-                        displayQty = final.toFixed(2).replace(/\.?0+$/, ''); 
-                    }
+                if(isNaN(val)) {
+                    li.textContent = ing; // Fallback
+                } else {
+                    const final = val * scale;
+                    li.innerHTML = `<span>${formatFraction(final)}</span> ${rest}`;
                 }
-                
-                li.innerHTML = `<span>${displayQty}</span> ${rest}`;
             } else {
                 li.textContent = ing;
             }
@@ -1180,13 +1240,9 @@
 
     // --- EVENT LISTENERS ---
     
-    // Custom Timer
     document.getElementById('customTimerBtn').onclick = () => {
         const minStr = prompt("Enter minutes for timer:", "5");
-        if(minStr === null || minStr.trim() === '') return;
-        const min = parseFloat(minStr);
-        if(!isNaN(min) && min > 0) runTimer(min, "Custom");
-        else alert("Please enter a valid positive number for minutes.");
+        if(minStr && !isNaN(parseFloat(minStr))) runTimer(parseFloat(minStr), "Custom");
     };
     document.getElementById('cancelTimerBtn').onclick = stopTimer;
 
@@ -1194,20 +1250,30 @@
     document.getElementById('viewRecipesBtn').onclick = () => showView('recipes');
     document.getElementById('viewMealPlanBtn').onclick = () => showView('mealPlan');
     document.getElementById('viewFavoritesBtn').onclick = () => showView('favorites');
+    document.getElementById('viewShoppingBtn').onclick = () => showView('shopping');
 
     function showView(v) {
         document.querySelectorAll('.view-toggle button').forEach(b => b.classList.remove('active'));
-        document.getElementById(`view${v.charAt(0).toUpperCase() + v.slice(1)}Btn`).classList.add('active');
+        // Correct button ID mapping
+        let btnId = 'viewRecipesBtn';
+        if(v === 'mealPlan') btnId = 'viewMealPlanBtn';
+        if(v === 'favorites') btnId = 'viewFavoritesBtn';
+        if(v === 'shopping') btnId = 'viewShoppingBtn';
+        document.getElementById(btnId).classList.add('active');
         
-        document.getElementById('recipesView').style.display = v === 'recipes' ? 'block' : 'none';
-        document.getElementById('mealPlanView').style.display = v === 'mealPlan' ? 'block' : 'none';
-        document.getElementById('favoritesView').style.display = v === 'favorites' ? 'block' : 'none';
+        document.getElementById('recipesView').style.display = 'none';
+        document.getElementById('mealPlanView').style.display = 'none';
+        document.getElementById('favoritesView').style.display = 'none';
+        document.getElementById('shoppingView').style.display = 'none';
+        
+        document.getElementById(v + 'View').style.display = 'block';
         
         document.getElementById('recipeControls').style.display = v === 'recipes' ? 'flex' : 'none';
 
         if(v === 'recipes') renderRecipeList();
-        else if(v === 'mealPlan') renderMealPlanGrid();
-        else if(v === 'favorites') renderFavoritesList();
+        if(v === 'mealPlan') renderMealPlanGrid();
+        if(v === 'favorites') renderFavoritesList();
+        if(v === 'shopping') renderShoppingList();
     }
 
     // Add Modal
@@ -1221,14 +1287,9 @@
         document.getElementById('recipeModal').classList.add('active');
     };
     
-    // Close Modals
-    document.querySelectorAll('.close-modal').forEach(b => b.onclick = () => {
-        document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
-        releaseWakeLock(); 
-        stopTimer(); 
-    });
+    document.querySelectorAll('.close-modal').forEach(b => b.onclick = closeModals);
 
-    // Edit Button in Detail
+    // Edit Button
     document.getElementById('btnEditRecipe').onclick = () => {
         const r = recipes.find(x=>x.id===activeRecipeId);
         if(!r) return;
@@ -1241,6 +1302,18 @@
         document.getElementById('inpServings').value = r.originalServings;
         document.getElementById('inpIngredients').value = r.ingredients.join('\n');
         document.getElementById('inpInstructions').value = r.instructions.join('\n');
+        
+        // Load Nutrition
+        if(r.nutrition) {
+            document.getElementById('inpCal').value = r.nutrition.cal || "";
+            document.getElementById('inpPro').value = r.nutrition.pro || "";
+            document.getElementById('inpCarb').value = r.nutrition.carb || "";
+            document.getElementById('inpFat').value = r.nutrition.fat || "";
+        } else {
+            document.getElementById('inpCal').value = ""; document.getElementById('inpPro').value = "";
+            document.getElementById('inpCarb').value = ""; document.getElementById('inpFat').value = "";
+        }
+
         updateStars(document.getElementById('inpRating'), r.rating);
         document.getElementById('inpRating').dataset.val = r.rating;
         currentImageFile = null; 
@@ -1248,13 +1321,10 @@
         document.getElementById('recipeModal').classList.add('active');
     };
 
-    // --- FORM SUBMISSION ---
+    // Form Submit
     document.getElementById('recipeForm').onsubmit = async (e) => {
         e.preventDefault(); 
         
-        const btn = document.getElementById('btnSave');
-        btn.textContent = 'Saving...'; btn.disabled = true;
-
         let data = {}; 
         try {
             data = {
@@ -1265,6 +1335,12 @@
                 ingredients: document.getElementById('inpIngredients').value.split('\n').filter(x=>x.trim()),
                 instructions: document.getElementById('inpInstructions').value.split('\n').filter(x=>x.trim()),
                 rating: parseInt(document.getElementById('inpRating').dataset.val || 0),
+                nutrition: {
+                    cal: document.getElementById('inpCal').value,
+                    pro: document.getElementById('inpPro').value,
+                    carb: document.getElementById('inpCarb').value,
+                    fat: document.getElementById('inpFat').value
+                },
                 imageData: null 
             };
             
@@ -1276,109 +1352,73 @@
             } else {
                 data.notes = ""; 
             }
-
-            // Call the main async save function
             await saveRecipe(data); 
 
-        } catch(error) {
-            console.error("Error in form submission handler:", error);
-        } finally {
-            btn.textContent = "Save Recipe"; btn.disabled = false;
-        }
+        } catch(error) { console.error("Error submitting form:", error); }
     };
 
-
-    // Image Upload with Resizing
+    // Image Upload
     document.getElementById('inpImage').onchange = (e) => {
         const file = e.target.files[0];
-        if (!file) {
-            currentImageFile = null;
-            return;
-        }
-
+        if (!file) { currentImageFile = null; return; }
         new Compressor(file, {
-            quality: 0.6, 
-            maxWidth: 800, 
-            maxHeight: 600, 
-            convertSize: 500000, 
+            quality: 0.6, maxWidth: 800, maxHeight: 600, convertSize: 500000, 
             success(result) {
                 const reader = new FileReader();
-                reader.onloadend = () => {
-                    currentImageFile = reader.result; 
-                    console.log(`Image compressed to ${ (currentImageFile.length / 1024).toFixed(1) } KB. Ready for upload.`);
-                };
+                reader.onloadend = () => { currentImageFile = reader.result; };
                 reader.readAsDataURL(result);
             },
-            error(err) {
-                console.error("Image compression error:", err.message);
-                alert("Image compression failed. Please try a different image or smaller file size.");
-                currentImageFile = null;
-            },
+            error(err) { alert("Compression error."); }
         });
     };
     
-    // Search & Filter Listeners
     document.getElementById('searchInput').oninput = renderRecipeList;
     document.getElementById('categoryFilter').onchange = renderRecipeList;
-
-    // Timer Logic in Detail View
+    
     document.getElementById('detDesiredServings').oninput = (e) => {
         const r = recipes.find(x=>x.id===activeRecipeId);
         if(r) renderIngredients(r, parseFloat(e.target.value)/parseFloat(r.originalServings));
     };
 
-    // Notes Autosave
     document.getElementById('detNotes').onchange = async (e) => {
         if(activeRecipeId) {
             try {
                 await updateDoc(doc(db, 'recipes', activeRecipeId), { notes: e.target.value });
                 recipes.find(x=>x.id===activeRecipeId).notes = e.target.value;
-                console.log("Notes saved successfully.");
-            } catch(error) {
-                console.error("Failed to save notes:", error);
-                alert("Failed to save notes. Check Firebase rules.");
-            }
+            } catch(error) { console.error("Failed to save notes:", error); }
         }
     };
 
     document.getElementById('btnPrint').onclick = () => window.print();
 
-    // Add Category
     document.getElementById('btnAddCat').onclick = async () => {
         const val = document.getElementById('inpNewCat').value.trim();
         if(val && !categories.includes(val)) {
-            categories.push(val);
-            categories.sort();
+            categories.push(val); categories.sort();
             await saveGlobalCategories(); 
             document.getElementById('inpCategory').value = val; 
             document.getElementById('inpNewCat').value = ''; 
-            console.log(`Category "${val}" added.`);
-        } else if (val) {
-            alert(`Category "${val}" already exists.`);
         }
     };
 
-    // Add to Meal Plan (Detail)
     document.getElementById('btnAddToPlan').onclick = async () => {
         const day = document.getElementById('detPlanDay').value;
-        if(day && activeRecipeId) {
-            await addToMealPlanFromDetail(day, activeRecipeId);
-        } else {
-            alert("Please select a day to add to meal plan.");
-        }
+        if(day && activeRecipeId) await addToMealPlanFromDetail(day, activeRecipeId);
+        else alert("Please select a day.");
     };
 
-    document.getElementById('mealPlanWeekSelect').onchange = renderMealPlanGrid;
+    document.getElementById('mealPlanWeekSelect').onchange = () => {
+        renderMealPlanGrid();
+        // If on shopping list view, refresh it too
+        if(document.getElementById('shoppingView').style.display !== 'none') renderShoppingList();
+    };
 
-    // Dark Mode Toggle
     document.getElementById('darkModeBtn').onclick = () => {
         document.body.classList.toggle('dark-mode');
-        const isDark = document.body.classList.contains('dark-mode');
-        localStorage.setItem('darkMode', isDark);
-        document.getElementById('darkModeBtn').textContent = isDark ? '☀' : '🌙';
+        localStorage.setItem('darkMode', document.body.classList.contains('dark-mode'));
+        document.getElementById('darkModeBtn').textContent = document.body.classList.contains('dark-mode') ? '☀' : '🌙';
     };
 
-    // Stars Click (Add/Edit Modal)
     document.getElementById('inpRating').onclick = (e) => {
         if(e.target.tagName === 'SPAN') {
             const v = parseInt(e.target.dataset.v);
@@ -1386,7 +1426,7 @@
             updateStars(document.getElementById('inpRating'), v);
         }
     }
-    // Stars Click (Detail - Autosave)
+    
     document.getElementById('detRating').onclick = async (e) => {
         if(e.target.tagName === 'SPAN' && activeRecipeId) {
             const v = parseInt(e.target.dataset.v);
@@ -1395,16 +1435,10 @@
                 await updateDoc(doc(db, 'recipes', activeRecipeId), { rating: parseInt(v) });
                 const r = recipes.find(x=>x.id===activeRecipeId);
                 if(r) r.rating = parseInt(v); 
-                renderRecipeList();
-                console.log("Rating updated successfully.");
-            } catch(error) {
-                console.error("Failed to update rating:", error);
-                alert("Failed to update rating. Check Firebase rules.");
-            }
+            } catch(error) { console.error(error); }
         }
     }
 
-    // --- INITIAL APP STARTUP ---
     init();
 </script>
 </body>

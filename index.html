@@ -63,6 +63,18 @@
         .view-toggle button { background: var(--card-bg); color: var(--text-color); border: 1px solid var(--border-color); }
         .view-toggle button.active { background: var(--button-primary); color: white; border-color: var(--button-primary); }
 
+        /* Tag Pill Styles */
+        .tag-input-wrapper { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 10px; background: var(--card-bg); }
+        .tag-input-wrapper input { flex-grow: 1; border: none; padding: 0; margin: 0; background: transparent; }
+        .tag-pill { display: inline-flex; align-items: center; background: var(--button-primary); color: white; padding: 4px 8px; border-radius: 16px; font-size: 0.85rem; }
+        .tag-pill .remove-tag { margin-left: 5px; cursor: pointer; font-weight: bold; color: rgba(255,255,255,0.7); }
+        .tag-pill .remove-tag:hover { color: white; }
+
+        .tag-filter-container { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+        .tag-filter-btn { background: var(--card-bg); border: 1px solid var(--border-color); padding: 6px 12px; border-radius: 8px; cursor: pointer; transition: background 0.2s; }
+        .tag-filter-btn.active { background: var(--button-primary); color: white; border-color: var(--button-primary); }
+
+
         /* Grid & Cards */
         #recipeList, #favoritesList { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; }
         .recipe-item { background: var(--card-bg); border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px var(--shadow-color); position: relative; cursor: pointer; border: 1px solid var(--border-color); }
@@ -83,12 +95,39 @@
         .meal-card img { width: 100%; height: 80px; object-fit: cover; display: block; }
         .meal-card-title { padding: 6px; font-size: 0.85rem; font-weight: 500; }
         .remove-meal-btn { position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.6); color: white; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; font-size: 10px; border: none; }
+        .meal-card.dragging { opacity: 0.5; border: 2px dashed var(--button-primary); }
+
 
         /* Shopping List */
-        .shopping-list-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; }
-        .shopping-item { display: flex; align-items: flex-start; background: var(--card-bg); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); }
+        .shopping-list-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .aisle-group {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .aisle-header {
+            background: var(--meal-plan-header-bg);
+            color: var(--meal-plan-header-text);
+            padding: 8px 12px;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+        .aisle-items {
+            padding: 10px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 10px;
+        }
+        .shopping-item { display: flex; align-items: flex-start; background: var(--bg-color); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); }
         .shopping-item input[type="checkbox"] { width: 20px; height: 20px; margin-right: 10px; margin-top: 2px; }
-        .shopping-item.checked span { text-decoration: line-through; opacity: 0.6; }
+        .shopping-item.checked { text-decoration: line-through; opacity: 0.6; }
+        .shopping-list-controls { display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 15px; }
+
 
         /* Nutrition */
         .nutrition-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; margin-bottom: 15px; }
@@ -104,12 +143,38 @@
         .close-modal { background: none; border: none; font-size: 1.8rem; color: var(--text-color); cursor: pointer; padding: 0; line-height: 1; }
 
         /* Split View (Detail) */
-        #detailModal .modal-content { height: 90vh; display: flex; flex-direction: column; }
-        .split-view-container { display: flex; flex: 1; overflow: hidden; }
-        .split-col { flex: 1; overflow-y: auto; padding: 20px 25px; }
-        .split-col.left { flex: 0 0 35%; border-right: 1px solid var(--border-color); background: rgba(0,0,0,0.02); }
-        @media (max-width: 768px) { .split-view-container { flex-direction: column; overflow-y: auto; } .split-col { overflow: visible; flex: none; border-bottom: 1px solid var(--border-color); } }
-        
+        #detailModal .modal-content {
+            height: 90vh;
+            display: flex;
+            flex-direction: column; 
+        }
+        .split-view-container {
+            display: flex;
+            flex: 1; 
+            overflow: hidden; 
+            flex-direction: column; /* Default for very small screens (e.g. phone portrait) */
+        }
+
+        /* Responsive Breakpoint for Split View - 769px and wider will show side-by-side */
+        @media (min-width: 769px) {
+            .split-view-container {
+                flex-direction: row; /* Split left/right */
+            }
+            .split-col.left {
+                flex: 0 0 35%; /* Fixed width for left column */
+                border-right: 1px solid var(--border-color);
+                background: rgba(0,0,0,0.02);
+            }
+            .split-col.right {
+                flex: 1; /* Remaining width for right column */
+            }
+        }
+        /* Ensure independent scrolling for columns regardless of width */
+        .split-col {
+            overflow-y: auto;
+            padding: 20px 25px;
+        }
+
         .ingredient-list li { padding: 8px 0; border-bottom: 1px solid var(--border-color); display: flex; }
         .ingredient-list li.checked { text-decoration: line-through; opacity: 0.5; }
         .stars span { font-size: 1.5rem; cursor: pointer; color: #ccc; }
@@ -141,9 +206,12 @@
     <div id="recipeControls" class="top-bar" style="background: var(--card-bg); padding: 15px; border-radius: 8px; border: 1px solid var(--border-color);">
         <button class="primary-btn" id="openAddModalBtn">+ Add Recipe</button>
         <input type="text" id="searchInput" placeholder="Search..." style="margin:0; flex-grow:1;">
-        <select id="categoryFilter" style="margin:0; width:auto;">
-            <option value="all">All Categories</option>
-        </select>
+        
+        <!-- TAG FILTER - Replaces category filter -->
+        <div id="tagFilterContainer" class="tag-filter-container">
+            <!-- Dynamic tag buttons will go here -->
+            <button class="tag-filter-btn" data-tag="all" id="allTagsBtn">All Tags</button>
+        </div>
     </div>
 
     <!-- VIEWS -->
@@ -163,8 +231,9 @@
     </div>
 
     <div id="shoppingView" style="display: none;">
-        <div style="padding:15px; background:var(--card-bg); border-radius:8px; margin-bottom:15px;">
-            <p style="margin:0;">Generates a list based on your Meal Plan selection.</p>
+        <div class="shopping-list-controls">
+            <button class="primary-btn" id="checkAllBtn">Check All</button>
+            <button class="primary-btn" id="clearCheckedBtn">Clear Checked</button>
         </div>
         <div id="shoppingListContainer" class="shopping-list-container"></div>
     </div>
@@ -199,11 +268,10 @@
                 <input type="text" id="inpTitle" placeholder="Recipe Title" required>
                 <input type="url" id="inpSource" placeholder="Source URL">
                 
-                <div style="display:flex; gap:10px;">
-                    <select id="inpCategory" style="flex:1;"></select>
-                    <input type="text" id="inpNewCat" placeholder="New Cat." style="flex:1;">
-                    <button type="button" id="btnAddCat" class="primary-btn">Add</button>
-                </div>
+                <!-- TAGS INPUT - Replaces category select -->
+                <label style="margin-top:10px; display:block; font-weight:bold;">Tags (comma-separated):</label>
+                <input type="text" id="inpTags" placeholder="e.g., Dinner, Quick, Vegetarian" list="availableTags">
+                <datalist id="availableTags"></datalist>
 
                 <label style="margin-top:10px; display:block; font-weight:bold;">Nutrition (Optional)</label>
                 <div style="display:flex; gap:10px; margin-bottom:10px;">
@@ -223,8 +291,8 @@
                 <label>Image:</label>
                 <input type="file" id="inpImage" accept="image/*">
                 
-                <label>Ingredients (one per line):</label>
-                <textarea id="inpIngredients" rows="6" required placeholder="e.g.&#10;2 cups Flour&#10;1 tsp Salt"></textarea>
+                <label>Ingredients (one per line, optionally add // Aisle at end):</label>
+                <textarea id="inpIngredients" rows="6" required placeholder="e.g.&#10;2 cups Flour // Baking&#10;1 tsp Salt // Spices"></textarea>
                 
                 <label>Instructions (one per line):</label>
                 <textarea id="inpInstructions" rows="6" required placeholder="e.g.&#10;Preheat oven to 350&#10;Mix dry ingredients"></textarea>
@@ -256,7 +324,10 @@
         </div>
         
         <div class="detail-meta-bar">
-            <span id="detCategory" class="detail-tag">Dinner</span>
+            <!-- TAGS DISPLAY - Replaces category display -->
+            <div id="detTags" class="tag-filter-container">
+                <!-- Tags will be dynamically inserted here -->
+            </div>
             <div class="stars" id="detRating">
                 <span data-v="1">★</span><span data-v="2">★</span><span data-v="3">★</span><span data-v="4">★</span><span data-v="5">★</span>
             </div>
@@ -319,7 +390,9 @@
     const storage = getStorage(app); 
 
     // --- STATE ---
-    let recipes = [], favorites = [], mealPlan = {}, categories = []; 
+    let recipes = [], favorites = [], mealPlan = {};
+    let allTags = []; // Replaces 'categories'
+    let selectedTagsFilter = new Set(); // For filtering recipes by tags
     let currentImageFile = null, activeRecipeId = null, currentTimer = null;
 
     // --- INIT ---
@@ -327,7 +400,7 @@
         console.log("App initializing...");
         await loadGlobalData();
         await loadRecipes();    
-        renderCategories();
+        renderTagFilters(); // Render tags instead of categories
         showView('recipes'); 
         if(localStorage.getItem('darkMode') === 'true') document.body.classList.add('dark-mode');
         console.log("App initialized.");
@@ -335,21 +408,21 @@
 
     async function loadGlobalData() {
         try {
-            console.log("Loading global data (favorites, mealPlan, categories)...");
-            const [favSnap, planSnap, catSnap] = await Promise.all([
+            console.log("Loading global data (favorites, mealPlan, tags)...");
+            const [favSnap, planSnap, tagsSnap] = await Promise.all([
                 getDoc(doc(db, 'appData', 'favorites')),
                 getDoc(doc(db, 'appData', 'mealPlan')),
-                getDoc(doc(db, 'appData', 'categories'))
+                getDoc(doc(db, 'appData', 'tags')) // Load tags instead of categories
             ]);
             favorites = favSnap.exists() ? (favSnap.data().ids || []) : [];
             mealPlan = planSnap.exists() ? (planSnap.data().plan || {}) : {};
-            categories = catSnap.exists() ? (catSnap.data().list || ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks']).sort() : ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks'].sort();
+            allTags = tagsSnap.exists() ? (tagsSnap.data().list || []).sort() : ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks'].sort();
             console.log("Global data loaded.");
         } catch(e) { 
             console.error("Error loading global data. Initializing defaults:", e);
             favorites = [];
             mealPlan = {};
-            categories = ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks'].sort();
+            allTags = ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks'].sort();
         }
     }
 
@@ -357,36 +430,84 @@
         try {
             console.log("Loading recipes...");
             const snap = await getDocs(collection(db, 'recipes'));
-            recipes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            recipes = snap.docs.map(d => {
+                const recipeData = d.data();
+                // IMPORTANT: Data migration/standardization on load
+                // If an old recipe has 'category' (string), convert it to 'tags' (array)
+                if (recipeData.category && !recipeData.tags) {
+                    recipeData.tags = [recipeData.category];
+                    delete recipeData.category; // Optionally delete old field
+                    // Note: This only changes local state. To persist, you'd need to re-save the recipe.
+                } else if (!recipeData.tags) {
+                    recipeData.tags = [];
+                }
+                return { id: d.id, ...recipeData };
+            });
             console.log(`Loaded ${recipes.length} recipes.`);
         } catch(e) { console.error("Failed to load recipes:", e); }
     }
 
-    // --- UI RENDERING ---
-    function renderCategories() {
-        const sel = document.getElementById('categoryFilter');
-        const inp = document.getElementById('inpCategory');
-        const currentFilterValue = sel.value; // Remember selected value
-        sel.innerHTML = '<option value="all">All Categories</option>';
-        inp.innerHTML = ''; 
-        categories.forEach(c => {
-            sel.add(new Option(c, c));
-            inp.add(new Option(c, c));
+    // --- TAG RENDERING AND MANAGEMENT ---
+    function renderTagFilters() {
+        const tagFilterContainer = document.getElementById('tagFilterContainer');
+        tagFilterContainer.innerHTML = ''; // Clear previous buttons
+        const allTagsBtn = document.createElement('button');
+        allTagsBtn.className = `tag-filter-btn ${selectedTagsFilter.size === 0 ? 'active' : ''}`;
+        allTagsBtn.textContent = 'All Tags';
+        allTagsBtn.onclick = () => {
+            selectedTagsFilter.clear();
+            renderTagFilters();
+            renderRecipeList();
+        };
+        tagFilterContainer.appendChild(allTagsBtn);
+
+        allTags.forEach(tag => {
+            const btn = document.createElement('button');
+            btn.className = `tag-filter-btn ${selectedTagsFilter.has(tag) ? 'active' : ''}`;
+            btn.textContent = tag;
+            btn.onclick = () => {
+                if (selectedTagsFilter.has(tag)) {
+                    selectedTagsFilter.delete(tag);
+                } else {
+                    selectedTagsFilter.add(tag);
+                }
+                renderTagFilters(); // Re-render to update active state
+                renderRecipeList();
+            };
+            tagFilterContainer.appendChild(btn);
         });
-        // Restore selected value or default to 'all'
-        sel.value = Array.from(sel.options).some(o => o.value === currentFilterValue) ? currentFilterValue : 'all';
-        inp.value = categories.length > 0 ? categories[0] : ''; // Default for input dropdown
+
+        // Also update datalist for input tags
+        const availableTagsDatalist = document.getElementById('availableTags');
+        availableTagsDatalist.innerHTML = '';
+        allTags.forEach(tag => {
+            const option = document.createElement('option');
+            option.value = tag;
+            availableTagsDatalist.appendChild(option);
+        });
     }
 
+    async function saveGlobalTags() {
+        try {
+            await setDoc(doc(db, 'appData', 'tags'), { list: allTags });
+            renderTagFilters(); // Re-render tag filter buttons and datalist
+            console.log("Tags saved to Cloud.");
+        } catch(e) { console.error("Failed to save tags to Cloud:", e); }
+    }
+
+    // --- RECIPE LIST RENDERING ---
     function renderRecipeList() {
         const container = document.getElementById('recipeList');
         container.innerHTML = '';
         const term = document.getElementById('searchInput').value.toLowerCase();
-        const cat = document.getElementById('categoryFilter').value;
+        
         const filtered = recipes.filter(r => {
             const matchesSearch = !term || r.title.toLowerCase().includes(term) || (r.ingredients && r.ingredients.some(i => i.toLowerCase().includes(term)));
-            const matchesCat = cat === 'all' || r.category === cat;
-            return matchesSearch && matchesCat;
+            
+            // Tag filtering: if no tags selected, all pass. If tags selected, recipe must have AT LEAST ONE of the selected tags.
+            const matchesTags = selectedTagsFilter.size === 0 || r.tags.some(tag => selectedTagsFilter.has(tag));
+            
+            return matchesSearch && matchesTags;
         });
         document.getElementById('emptyMessage').style.display = filtered.length ? 'none' : 'block';
         filtered.forEach(r => container.appendChild(createRecipeCard(r)));
@@ -435,7 +556,6 @@
         try {
             let recipeData = JSON.parse(jsonText);
 
-            // Helper to find the "Recipe" object inside the JSON-LD structure
             const findRecipe = (obj) => {
                 if (obj && (obj['@type'] === 'Recipe' || (Array.isArray(obj['@type']) && obj['@type'].includes('Recipe')))) return obj;
                 return null;
@@ -444,7 +564,7 @@
             let foundRecipe = null;
             if (Array.isArray(recipeData)) {
                 foundRecipe = recipeData.find(findRecipe);
-            } else if (recipeData['@graph']) { // Common in some schemas
+            } else if (recipeData['@graph']) { 
                 foundRecipe = recipeData['@graph'].find(findRecipe);
             } else {
                 foundRecipe = findRecipe(recipeData);
@@ -455,19 +575,26 @@
                 return;
             }
             
-            // Populate form fields
             document.getElementById('inpTitle').value = foundRecipe.name || "";
             document.getElementById('inpSource').value = foundRecipe.url || "";
             document.getElementById('inpServings').value = parseInt(foundRecipe.recipeYield) || 4;
 
-            // Ingredients
+            // Tags: attempt to extract keywords as tags
+            let importedTags = [];
+            if (foundRecipe.keywords) {
+                importedTags = Array.isArray(foundRecipe.keywords) ? foundRecipe.keywords : foundRecipe.keywords.split(',').map(t => t.trim());
+            } else if (foundRecipe.recipeCategory) {
+                importedTags = Array.isArray(foundRecipe.recipeCategory) ? foundRecipe.recipeCategory : [foundRecipe.recipeCategory];
+            }
+            document.getElementById('inpTags').value = importedTags.join(', ');
+
+
             if (foundRecipe.recipeIngredient) {
                 document.getElementById('inpIngredients').value = Array.isArray(foundRecipe.recipeIngredient) 
                     ? foundRecipe.recipeIngredient.join('\n') 
                     : foundRecipe.recipeIngredient;
             }
 
-            // Instructions
             if (foundRecipe.recipeInstructions) {
                 let instructions = [];
                 if (Array.isArray(foundRecipe.recipeInstructions)) {
@@ -478,20 +605,19 @@
                 document.getElementById('inpInstructions').value = instructions.join('\n');
             }
 
-            // Nutrition (if available)
             if (foundRecipe.nutrition) {
                 document.getElementById('inpCal').value = parseInt(foundRecipe.nutrition.calories) || "";
                 document.getElementById('inpPro').value = parseInt(foundRecipe.nutrition.proteinContent) || "";
                 document.getElementById('inpCarb').value = parseInt(foundRecipe.nutrition.carbohydrateContent) || "";
                 document.getElementById('inpFat').value = parseInt(foundRecipe.nutrition.fatContent) || "";
-            } else { // Clear previous values if no nutrition found
+            } else { 
                 document.getElementById('inpCal').value = "";
                 document.getElementById('inpPro').value = "";
                 document.getElementById('inpCarb').value = "";
                 document.getElementById('inpFat').value = "";
             }
 
-            alert("Recipe data parsed! Please review and select a category before saving.");
+            alert("Recipe data parsed! Please review and select tags before saving.");
             document.getElementById('inpImportJson').value = ''; // Clear the textarea
         } catch (error) {
             alert("Error parsing JSON: " + error.message + "\nPlease ensure you've pasted valid JSON-LD.");
@@ -521,24 +647,32 @@
                 <div class="day-content"></div>
             `;
 
-            // Add Recipe to Day button logic
             col.querySelector('.add-meal-day-btn').onclick = (e) => {
-                e.stopPropagation(); // Prevent drag-drop issues
+                e.stopPropagation(); 
                 openSelectModal(dayKey, day);
             };
 
             const content = col.querySelector('.day-content');
             
-            // DRAG & DROP LOGIC
-            content.addEventListener('dragover', (e) => { e.preventDefault(); col.classList.add('drag-over'); });
+            content.addEventListener('dragover', (e) => { 
+                e.preventDefault(); 
+                const afterElement = getDragAfterElement(content, e.clientY);
+                const dragging = document.querySelector('.meal-card.dragging');
+                if (dragging && afterElement) {
+                    content.insertBefore(dragging, afterElement);
+                } else if (dragging) {
+                    content.appendChild(dragging);
+                }
+                col.classList.add('drag-over'); 
+            });
             content.addEventListener('dragleave', () => col.classList.remove('drag-over'));
             
             content.addEventListener('drop', async (e) => {
                 e.preventDefault();
                 col.classList.remove('drag-over');
                 const recipeId = e.dataTransfer.getData('text/plain');
-                const sourceType = e.dataTransfer.getData('source-type'); // 'list' or 'plan'
-                const sourceDayKey = e.dataTransfer.getData('source-day'); // Only for 'plan' type drags
+                const sourceType = e.dataTransfer.getData('source-type'); 
+                const sourceDayKey = e.dataTransfer.getData('source-day'); 
                 
                 console.log(`Drop event: Recipe ID ${recipeId}, Source Type '${sourceType}', Source Day '${sourceDayKey}', Target Day '${dayKey}'`);
 
@@ -552,15 +686,14 @@
                 // Handle MOVE operation (from one meal plan day to another)
                 if (sourceType === 'plan' && sourceDayKey && sourceDayKey !== dayKey) {
                     console.log(`Performing MOVE: Removing from ${sourceDayKey}, adding to ${dayKey}`);
-                    // Remove from old day
                     mealPlan[sourceDayKey] = mealPlan[sourceDayKey].filter(id => id !== recipeId);
-                    if (mealPlan[sourceDayKey].length === 0) delete mealPlan[sourceDayKey]; // Clean up empty day
+                    if (mealPlan[sourceDayKey].length === 0) delete mealPlan[sourceDayKey]; 
                     
-                    // Add to new day if not already there
                     if (!mealPlan[dayKey].includes(recipeId)) {
-                        mealPlan[dayKey].push(recipeId);
+                        const newOrder = Array.from(content.children).map(el => el.dataset.recipeId);
+                        mealPlan[dayKey] = newOrder.filter(id => id !== recipeId).concat(recipeId); // Ensure it's added at the end if not already present
                     } else {
-                        console.log(`Recipe ${recipeId} already exists in target day ${dayKey}.`);
+                        console.log(`Recipe ${recipeId} already exists in target day ${dayKey}. Reordering only.`);
                     }
                 } 
                 // Handle COPY operation (from the main recipe list)
@@ -569,19 +702,24 @@
                     if (mealPlan[dayKey].includes(recipeId)) {
                         alert("Recipe already on this day's plan.");
                     } else {
-                        mealPlan[dayKey].push(recipeId);
+                        const newOrder = Array.from(content.children).map(el => el.dataset.recipeId);
+                        mealPlan[dayKey] = newOrder.filter(id => id !== recipeId).concat(recipeId); // Add at the end
                     }
                 } 
-                // Handle drag within the same day (no change to content, only visual if reordering were implemented)
+                // Handle reordering within the same day
                 else if (sourceType === 'plan' && sourceDayKey === dayKey) {
-                    console.log(`Dragged recipe ${recipeId} within ${dayKey} (no change to data, reordering not implemented yet)`);
-                    // If you wanted to allow reordering, you'd need more complex DOM manipulation here
+                    console.log(`Performing REORDER within ${dayKey}`);
+                    const newOrder = Array.from(content.children).map(el => el.dataset.recipeId);
+                    mealPlan[dayKey] = newOrder;
                 } else {
                     console.log("Drop event occurred, but no specific action taken based on source type or day.");
                 }
+                
+                // Clear any dragging classes
+                document.querySelectorAll('.meal-card.dragging').forEach(el => el.classList.remove('dragging'));
 
                 await setDoc(doc(db, 'appData', 'mealPlan'), { plan: mealPlan });
-                renderMealPlanGrid(); // Re-render the entire grid to reflect changes
+                renderMealPlanGrid(); 
             });
 
             (mealPlan[dayKey] || []).forEach(id => {
@@ -604,7 +742,7 @@
             e.stopPropagation();
             console.log(`Removing recipe ${r.id} from day ${dayKey}`);
             mealPlan[dayKey] = mealPlan[dayKey].filter(x => x !== r.id);
-            if (mealPlan[dayKey].length === 0) delete mealPlan[dayKey]; // Clean up empty day
+            if (mealPlan[dayKey].length === 0) delete mealPlan[dayKey]; 
             await setDoc(doc(db, 'appData', 'mealPlan'), { plan: mealPlan });
             renderMealPlanGrid();
         };
@@ -613,11 +751,30 @@
             e.dataTransfer.setData('text/plain', r.id);
             e.dataTransfer.setData('source-type', 'plan'); // Indicate drag is from meal plan (move potential)
             e.dataTransfer.setData('source-day', dayKey); // Store source day key
+            e.target.classList.add('dragging'); // Add class to the dragged item
             console.log(`Dragstart from meal plan: Recipe ID ${r.id}, Source Type 'plan', Source Day '${dayKey}'`);
+        });
+
+        card.addEventListener('dragend', (e) => {
+            e.target.classList.remove('dragging'); // Remove class when drag ends
         });
         
         card.onclick = () => openDetail(r);
         return card;
+    }
+
+    // Helper for finding position during dragover (meal plan reordering)
+    function getDragAfterElement(container, y) {
+        const draggableElements = [...container.querySelectorAll('.meal-card:not(.dragging)')];
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: -Infinity }).element;
     }
 
     // Manual Add Modal for Meal Plan Days
@@ -627,7 +784,6 @@
         document.getElementById('targetDayName').textContent = dayName;
         const sel = document.getElementById('mealPlanSelectDropdown');
         sel.innerHTML = '<option value="">Select a Recipe...</option>';
-        // Sort recipes alphabetically
         [...recipes].sort((a,b) => a.title.localeCompare(b.title)).forEach(r => {
             sel.add(new Option(r.title, r.id));
         });
@@ -685,33 +841,68 @@
         'fresh', 'frozen', 'dried', 'ground', 'whole', 'cut', 'cubed', 'quartered', 'halved',
         'peeled', 'unpeeled', 'seeded', 'cored', 'rinsed', 'drained', 'patted dry', 'wiped',
         'unsalted', 'salted', 'low-sodium', 'reduced-sodium', 'full-fat', 'low-fat', 'fat-free',
-        'sweet', 'sour', 'bitter', 'spicy', 'hot', 'mild', 'extra',
-        'cold', 'warm', 'hot', 'room temperature', 'chilled',
+        'sweet', 'sour', 'bitter', 'spicy', 'hot', 'mild', 'extra', 'fine', 'coarse',
+        'cold', 'warm', 'hot', 'room temperature', 'chilled', 'lukewarm',
         'packed', 'heaping', 'lightly packed', 'loose', 'a', 'an', 'the', 'some',
-        'good quality', 'best quality', 'fine', 'coarse', 'superfine',
-        'a pinch of', 'a dash of', 'a sprinkle of', 'a couple of', 'toasted', 'roasted', 'cooked', 'raw', 'blanched',
-        'organic', 'farm-fresh', 'aged', 'filtered', 'divided', 'such as', 'plus more for garnish',
+        'good quality', 'best quality', 'superfine', 'blanched',
+        'a pinch of', 'a dash of', 'a sprinkle of', 'a couple of', 'toasted', 'roasted', 'cooked', 'raw',
+        'organic', 'farm-fresh', 'aged', 'filtered', 'divided', 'such as',
         'or more', 'or less', 'about', 'approximately', 'small', 'medium', 'large', 'jumbo', 'extra large', 'tiny', 'baby',
-        'for serving', 'for garnish', 'as needed', 'to taste', 'optional'
+        'for serving', 'for garnish', 'as needed', 'to taste', 'optional', 'plus more for dusting', 'plus more for serving', 'for pan', 'for coating'
     ];
 
-    // Helper to extract quantity, unit, and normalized name from an ingredient string
+    // Default aisle mapping (you can expand this list!)
+    const defaultAisleMap = {
+        'flour': 'Baking', 'sugar': 'Baking', 'baking powder': 'Baking', 'baking soda': 'Baking', 'vanilla extract': 'Baking',
+        'butter': 'Dairy', 'milk': 'Dairy', 'cheese': 'Dairy', 'yogurt': 'Dairy', 'eggs': 'Dairy', 'cream': 'Dairy',
+        'chicken': 'Meat & Seafood', 'beef': 'Meat & Seafood', 'pork': 'Meat & Seafood', 'fish': 'Meat & Seafood', 'shrimp': 'Meat & Seafood',
+        'onion': 'Produce', 'garlic': 'Produce', 'potato': 'Produce', 'carrot': 'Produce', 'lettuce': 'Produce', 'tomato': 'Produce', 'apple': 'Produce', 'banana': 'Produce',
+        'salt': 'Spices & Seasonings', 'pepper': 'Spices & Seasonings', 'oregano': 'Spices & Seasonings', 'cumin': 'Spices & Seasonings',
+        'pasta': 'Pantry', 'rice': 'Pantry', 'canola oil': 'Pantry', 'olive oil': 'Pantry', 'vinegar': 'Pantry', 'broth': 'Pantry', 'canned tomato': 'Pantry',
+        'bread': 'Bakery', 'rolls': 'Bakery'
+    };
+
+    function getAisleSuggestion(ingredientName) {
+        // First, check if the ingredient has an explicit aisle defined by the user
+        const aisleMatch = ingredientName.match(/(\s*\/\/\s*)([^/]+)$/);
+        if (aisleMatch && aisleMatch[2]) {
+            return aisleMatch[2].trim().replace(/\s{2,}/g, ' ').replace(/(^|\s)\S/g, l => l.toUpperCase()); // Capitalize words
+        }
+
+        // If not, use the default map
+        for (const [key, aisle] of Object.entries(defaultAisleMap)) {
+            if (ingredientName.includes(key)) {
+                return aisle;
+            }
+        }
+        return 'Other'; // Fallback
+    }
+
     function normalizeIngredientName(ingredientString) {
         let original = ingredientString.toLowerCase().trim();
         let quantity = 0;
         let unit = '';
-        let name = original; // Default to original if nothing else matches
+        let name = original; 
+        let aisle = getAisleSuggestion(original); // Get aisle before stripping parts
 
         console.log(`--- Parsing "${original}" ---`);
 
-        // 1. Extract Quantity
         let remaining = original;
-        const qtyMatch = original.match(quantityRegex);
+
+        // Strip user-defined aisle hint before parsing quantities/units
+        const aisleHintRemovedMatch = remaining.match(/^(.*?)(?:\s*\/\/\s*[^/]+)$/);
+        if (aisleHintRemovedMatch) {
+            remaining = aisleHintRemovedMatch[1].trim();
+        }
+
+
+        // 1. Try to extract Quantity
+        const qtyMatch = remaining.match(quantityRegex);
         if (qtyMatch) {
             let qtyStr = qtyMatch[1].trim();
-            remaining = original.substring(qtyMatch[0].length).trim();
+            remaining = remaining.substring(qtyMatch[0].length).trim();
 
-            if (qtyStr.includes('/')) { // Handle fractions and mixed numbers (e.g., "1 1/2" or "1/2")
+            if (qtyStr.includes('/')) { 
                 const parts = qtyStr.split(' ').map(p => {
                     if (p.includes('/')) {
                         const [n, d] = p.split('/');
@@ -724,59 +915,52 @@
                 quantity = parseFloat(qtyStr);
             }
         } else {
-            // If no quantity is found, assume 1 (e.g., "large onion", "salt")
-            quantity = 1;
+            quantity = 1; 
         }
         console.log(`  Quantity: ${quantity}`);
         console.log(`  Remaining after qty: "${remaining}"`);
 
+        // 2. Try to extract Unit
+        const sortedUnits = Object.keys(unitMap).sort((a, b) => b.length - a.length);
+        let foundUnitMatch = false;
 
-        // 2. Extract Unit
-        let foundUnit = false;
-        for (const u of Object.keys(unitMap)) {
-            // Match whole word, optionally followed by '.' or 'of '
-            const unitRegex = new RegExp(`^(${u})[s.]?(?:\\s+of\\b|\\b)?`, 'i');
-            const unitMatch = remaining.match(unitRegex);
+        for (const u of sortedUnits) {
+            const unitMatchRegex = new RegExp(`^(${u})(?:s|\\.)?(?:\\s+of\\b|\\b)?`, 'i');
+            const matchInRemaining = remaining.match(unitMatchRegex);
 
-            if (unitMatch) {
+            if (matchInRemaining) {
                 unit = unitMap[u]; // Use normalized unit
-                remaining = remaining.substring(unitMatch[0].length).trim();
-                foundUnit = true;
-                break; // Found the unit, move on
+                remaining = remaining.substring(matchInRemaining[0].length).trim();
+                foundUnitMatch = true;
+                break; 
             }
         }
-        console.log(`  Unit: "${unit}" (found: ${foundUnit})`);
+        console.log(`  Unit: "${unit}" (found: ${foundUnitMatch})`);
         console.log(`  Remaining after unit: "${remaining}"`);
 
-        // Now, `remaining` should be the raw ingredient name (plus descriptors)
-        name = remaining || original; // Fallback if remaining is empty
+        name = remaining;
 
         // 3. Strip common descriptors from the name
         let cleanedName = name;
         commonDescriptors.forEach(desc => {
-            // Use regex with word boundaries to avoid partial matches, case-insensitive
-            // Also handle cases like "salt, fine" -> "salt" by stripping from end
-            cleanedName = cleanedName.replace(new RegExp(`\\b${desc}\\b`, 'gi'), '').trim();
+            const descPattern = new RegExp(`(?:^|,|\\s)\\b${desc}\\b(?:$|,|\\s)`, 'gi');
+            cleanedName = cleanedName.replace(descPattern, ' ').trim();
         });
 
-        // Remove extraneous spaces, leading/trailing punctuation (except apostrophes)
         cleanedName = cleanedName.replace(/^[,\s.]+/, '').replace(/[,\s.]+$/, '').replace(/\s{2,}/g, ' ').trim();
         
-        // Final singularization heuristic for the ingredient name (not units)
-        // Avoid singularizing words like "glass", "molasses", "oats"
-        if (cleanedName.length > 3 && cleanedName.endsWith('s') && !['molasses', 'asparagus', 'oats'].includes(cleanedName)) {
+        const exceptions = ['molasses', 'asparagus', 'oats', 'chips', 'nuts', 'beans', 'peas', 'greens', 'glass'];
+        if (cleanedName.length > 3 && cleanedName.endsWith('s') && !exceptions.includes(cleanedName)) {
              cleanedName = cleanedName.slice(0, -1);
         }
 
-        // If cleaning resulted in an empty string, fall back to something more recognizable
         if (!cleanedName) {
-            cleanedName = name; // Use name before heavy stripping
+            cleanedName = name; 
         }
         if (!cleanedName) {
-            cleanedName = original; // Use original if all else fails
+            cleanedName = original; 
         }
         
-        // Ensure name starts with a letter or number if it's currently whitespace/punctuation
         cleanedName = cleanedName.replace(/^[^a-z0-9]*/i, '').trim();
         
         console.log(`  Cleaned Name: "${cleanedName}"`);
@@ -785,18 +969,18 @@
         return {
             quantity: quantity,
             unit: unit,
-            name: cleanedName
+            name: cleanedName,
+            aisle: aisle
         };
     }
 
     // Helper for displaying fractions nicely
     function formatFraction(d) {
-        if (typeof d !== 'number' || isNaN(d)) return "";
-        const tolerance = 0.005; // Adjusted tolerance for better matching
+        if (typeof d !== 'number' || isNaN(d) || d === 0) return "0";
+        const tolerance = 0.005; 
         const whole = Math.floor(d);
         const rem = d - whole;
 
-        // Check for exact whole numbers
         if (Math.abs(rem) < tolerance) return Math.round(d).toString();
 
         const fracs = {
@@ -806,7 +990,7 @@
         };
         
         let closestFractionSymbol = "";
-        let minDiff = 1; // Start with a larger difference
+        let minDiff = 1; 
 
         for (let key in fracs) {
             const val = parseFloat(key);
@@ -816,11 +1000,10 @@
             }
         }
 
-        if (closestFractionSymbol && minDiff < tolerance * 2) { // Use a slightly looser tolerance for selection than for whole numbers
+        if (closestFractionSymbol && minDiff < tolerance * 2) { 
             return whole > 0 ? `${whole} ${closestFractionSymbol}` : closestFractionSymbol;
         }
-        // Fallback to 2 decimals if no good fraction match
-        return d.toFixed(2).replace(/\.?0+$/, ''); // Remove trailing .00 or .0
+        return d.toFixed(2).replace(/\.?0+$/, ''); 
     }
 
     function renderShoppingList() {
@@ -847,41 +1030,73 @@
         allIngredientsRaw.forEach(line => {
             const parsed = normalizeIngredientName(line);
 
-            // Create a consistent aggregation key: "name (unit)" or just "name" if no unit
+            // Create a consistent aggregation key: "name (unit)"
+            // Aisle is used for grouping, not for aggregation key
             let aggKey = parsed.name;
             if (parsed.unit) {
                 aggKey += ` (${parsed.unit})`;
             }
 
             if (!aggregatedIngredients[aggKey]) {
-                aggregatedIngredients[aggKey] = { quantity: 0, unit: parsed.unit, name: parsed.name };
+                aggregatedIngredients[aggKey] = { quantity: 0, unit: parsed.unit, name: parsed.name, aisle: parsed.aisle };
             }
             aggregatedIngredients[aggKey].quantity += parsed.quantity;
         });
 
-        // Render aggregated list
-        Object.values(aggregatedIngredients).sort((a,b) => a.name.localeCompare(b.name)).forEach(item => {
-            const d = document.createElement('div');
-            d.className = 'shopping-item';
-            
-            let displayQuantity = formatFraction(item.quantity);
-            let displayText;
-
-            // Decide how to display: "1 cup flour", "2 eggs", "salt"
-            if (item.unit && item.name) {
-                // Example: "1 cup butter"
-                displayText = `${displayQuantity} ${item.unit} ${item.name}`;
-            } else if (item.name && item.quantity > 0 && !isNaN(item.quantity)) { 
-                // Example: "2 onion" (where unit couldn't be parsed but quantity was)
-                // Or just "salt" if quantity is 1 and no unit
-                displayText = `${displayQuantity} ${item.name}`;
-            } else { // Fallback, e.g., "salt" or original string if parsing failed significantly
-                displayText = item.name || "Unknown Item"; // Use cleaned name or a fallback
+        // Group by aisle
+        const itemsByAisle = {};
+        Object.values(aggregatedIngredients).forEach(item => {
+            const aisleName = item.aisle || 'Other';
+            if (!itemsByAisle[aisleName]) {
+                itemsByAisle[aisleName] = [];
             }
-            
-            d.innerHTML = `<input type="checkbox"><span>${displayText}</span>`;
-            d.querySelector('input').onclick = (e) => e.target.checked ? d.classList.add('checked') : d.classList.remove('checked');
-            div.appendChild(d);
+            itemsByAisle[aisleName].push(item);
+        });
+
+        // Sort aisles (e.g., Produce, Dairy, Meat, Pantry, etc.)
+        const sortedAisles = Object.keys(itemsByAisle).sort((a, b) => {
+            // Custom sort order for common aisles
+            const order = ['Produce', 'Bakery', 'Meat & Seafood', 'Dairy', 'Frozen', 'Pantry', 'Baking', 'Spices & Seasonings', 'Beverages', 'Canned Goods', 'Other'];
+            const indexA = order.indexOf(a);
+            const indexB = order.indexOf(b);
+            if (indexA === -1 && indexB === -1) return a.localeCompare(b); // Both not in custom order
+            if (indexA === -1) return 1; // A is not in custom order, so B comes first
+            if (indexB === -1) return -1; // B is not in custom order, so A comes first
+            return indexA - indexB; // Sort by custom order
+        });
+
+
+        // Render grouped and sorted list
+        sortedAisles.forEach(aisle => {
+            const aisleGroupDiv = document.createElement('div');
+            aisleGroupDiv.className = 'aisle-group';
+            aisleGroupDiv.innerHTML = `<div class="aisle-header">${aisle}</div><div class="aisle-items"></div>`;
+            const aisleItemsContainer = aisleGroupDiv.querySelector('.aisle-items');
+
+            itemsByAisle[aisle].sort((a,b) => a.name.localeCompare(b.name)).forEach(item => {
+                const d = document.createElement('div');
+                d.className = 'shopping-item';
+                
+                let displayQuantity = formatFraction(item.quantity);
+                let displayText;
+
+                if (item.unit && item.name) {
+                    displayText = `${displayQuantity} ${item.unit} ${item.name}`;
+                } else if (item.name && item.quantity > 0 && !isNaN(item.quantity)) { 
+                    if (item.quantity === 1 && !item.unit && item.name.split(' ').length === 1) {
+                         displayText = item.name;
+                    } else {
+                         displayText = `${displayQuantity} ${item.name}`;
+                    }
+                } else {
+                    displayText = item.name || "Unknown Item"; 
+                }
+                
+                d.innerHTML = `<input type="checkbox"><span>${displayText}</span>`;
+                d.querySelector('input').onclick = (e) => e.target.checked ? d.classList.add('checked') : d.classList.remove('checked');
+                aisleItemsContainer.appendChild(d);
+            });
+            div.appendChild(aisleGroupDiv);
         });
         console.log("Shopping list rendered.");
     }
@@ -891,7 +1106,6 @@
     async function toggleFavorite(id) {
         favorites.includes(id) ? favorites=favorites.filter(x=>x!==id) : favorites.push(id);
         await setDoc(doc(db,'appData','favorites'), {ids:favorites});
-        // Re-render appropriate lists
         if(document.getElementById('viewFavoritesBtn').classList.contains('active')) renderFavoritesList();
         else renderRecipeList();
     }
@@ -905,7 +1119,6 @@
             }
             await deleteDoc(doc(db, 'recipes', id));
             
-            // Cleanup from global lists
             favorites = favorites.filter(x => x !== id); await setDoc(doc(db,'appData','favorites'), {ids:favorites});
             
             let mealPlanChanged = false;
@@ -919,13 +1132,12 @@
             if(mealPlanChanged) await setDoc(doc(db, 'appData', 'mealPlan'), { plan: mealPlan });
 
             await loadRecipes(); 
-            // Re-render the current active view
             const activeViewBtn = document.querySelector('.view-toggle button.active');
             if (activeViewBtn) {
                 const viewName = activeViewBtn.id.replace('view','').toLowerCase().replace('btn','');
                 showView(viewName);
             } else {
-                showView('recipes'); // Fallback
+                showView('recipes'); 
             }
         } catch (e) { alert("Error deleting recipe."); console.error(e); }
     }
@@ -936,13 +1148,23 @@
             if(currentImageFile) {
                 const snap = await uploadString(ref(storage, `img_${Date.now()}`), currentImageFile, 'data_url');
                 data.imageData = await getDownloadURL(snap.ref);
-            } else if (data.id) { // Keep existing image if not uploading new one
+            } else if (data.id) { 
                 const old = recipes.find(r=>r.id===data.id);
                 if(old) data.imageData = old.imageData;
             }
+            
+            // Add new tags to the global list if they don't exist
+            data.tags.forEach(tag => {
+                if (!allTags.includes(tag)) {
+                    allTags.push(tag);
+                }
+            });
+            allTags.sort(); // Keep tags sorted
+
             if(data.id) await updateDoc(doc(db,'recipes',data.id), data);
             else await addDoc(collection(db,'recipes'), data);
             
+            await saveGlobalTags(); // Save updated global tags list
             await loadRecipes();
             showView('recipes');
             document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('active'));
@@ -952,14 +1174,30 @@
 
     // --- MODALS AND DETAILS ---
     function openDetail(r) {
-        activeRecipeId = r.id; // Set for edit/notes save
+        activeRecipeId = r.id; 
         document.getElementById('detTitle').textContent = r.title;
-        document.getElementById('detCategory').textContent = r.category;
+        
+        // Tags display
+        const detTagsDiv = document.getElementById('detTags');
+        detTagsDiv.innerHTML = '';
+        if (r.tags && r.tags.length > 0) {
+            r.tags.forEach(tag => {
+                const span = document.createElement('span');
+                span.className = 'detail-tag';
+                span.textContent = tag;
+                detTagsDiv.appendChild(span);
+            });
+        } else {
+            const span = document.createElement('span');
+            span.className = 'detail-tag';
+            span.textContent = 'Untagged';
+            detTagsDiv.appendChild(span);
+        }
+
         document.getElementById('detOrigServings').textContent = r.originalServings;
         document.getElementById('detDesiredServings').value = r.originalServings;
         document.getElementById('detNotes').value = r.notes || '';
         
-        // Nutrition
         const nGrid = document.getElementById('detNutrition');
         if(r.nutrition && (r.nutrition.cal || r.nutrition.pro || r.nutrition.carb || r.nutrition.fat)) {
             nGrid.style.display='grid';
@@ -969,7 +1207,6 @@
             document.getElementById('valFat').textContent = (r.nutrition.fat || 0)+'g';
         } else nGrid.style.display='none';
 
-        // Source Link
         const srcLink = document.getElementById('detSourceLink');
         if(r.source && r.source.trim() !== '') {
             srcLink.href = r.source; srcLink.style.display = 'block';
@@ -978,7 +1215,6 @@
         updateStars(document.getElementById('detRating'), r.rating || 0);
         renderIngredientsInDetail(r, 1);
 
-        // Instructions
         const div = document.getElementById('detInstructions'); div.innerHTML='';
         r.instructions.forEach((s,i) => {
             const d = document.createElement('div'); d.className='instruction-step';
@@ -987,7 +1223,6 @@
         });
 
         document.getElementById('detailModal').classList.add('active');
-        //requestWakeLock(); // Removed wakeLock as it's not strictly necessary for viewing
     }
 
     function renderIngredientsInDetail(r, scale) {
@@ -1001,16 +1236,17 @@
             const parsed = normalizeIngredientName(ing);
             let displayText;
 
-            // Use parsed info to display. Combine quantity, unit, and name.
             let scaledQuantity = parsed.quantity * scale;
 
             if (parsed.unit && parsed.name) {
                 displayText = `${formatFraction(scaledQuantity)} ${parsed.unit} ${parsed.name}`;
             } else if (parsed.name && parsed.quantity > 0 && !isNaN(scaledQuantity)) {
-                // If no unit, but quantity and name present (e.g., "2 large onion" scaled)
-                displayText = `${formatFraction(scaledQuantity)} ${parsed.name}`;
+                if (scaledQuantity === 1 && !parsed.unit && parsed.name.split(' ').length === 1) {
+                     displayText = parsed.name;
+                } else {
+                     displayText = `${formatFraction(scaledQuantity)} ${parsed.name}`;
+                }
             } else {
-                // Fallback to original if parsing was minimal or quantity was zero/NaN
                 displayText = ing; 
             }
             li.textContent = displayText;
@@ -1074,7 +1310,11 @@
         document.getElementById(`view${v.charAt(0).toUpperCase()+v.slice(1)}Btn`).classList.add('active');
         ['recipes','mealPlan','shopping','favorites'].forEach(x=>document.getElementById(`${x}View`).style.display='none');
         document.getElementById(`${v}View`).style.display='block';
+        
+        // Hide/Show tag filter based on view
         document.getElementById('recipeControls').style.display = v==='recipes'?'flex':'none';
+
+        // Specific rendering logic for each view
         if(v==='recipes') renderRecipeList();
         else if(v==='mealPlan') renderMealPlanGrid();
         else if(v==='shopping') renderShoppingList();
@@ -1087,6 +1327,7 @@
         document.getElementById('editId').value = "";
         document.getElementById('inpSource').value = "";
         document.getElementById('inpImportJson').value = ""; // Clear import textarea
+        document.getElementById('inpTags').value = ""; // Clear tags input
         currentImageFile = null; 
         updateStars(document.getElementById('inpRating'), 0);
         document.getElementById('modalTitle').textContent = "Add New Recipe";
@@ -1103,12 +1344,11 @@
         document.getElementById('editId').value = r.id;
         document.getElementById('inpTitle').value = r.title;
         document.getElementById('inpSource').value = r.source || "";
-        document.getElementById('inpCategory').value = r.category;
+        document.getElementById('inpTags').value = r.tags ? r.tags.join(', ') : ""; // Set tags
         document.getElementById('inpServings').value = r.originalServings;
         document.getElementById('inpIngredients').value = r.ingredients.join('\n');
         document.getElementById('inpInstructions').value = r.instructions.join('\n');
         
-        // Load Nutrition for editing
         if(r.nutrition) {
             document.getElementById('inpCal').value = r.nutrition.cal || "";
             document.getElementById('inpPro').value = r.nutrition.pro || "";
@@ -1132,7 +1372,7 @@
         const d = {
             title: document.getElementById('inpTitle').value,
             source: document.getElementById('inpSource').value,
-            category: document.getElementById('inpCategory').value,
+            tags: document.getElementById('inpTags').value.split(',').map(tag => tag.trim()).filter(tag => tag), // Parse tags
             originalServings: document.getElementById('inpServings').value,
             ingredients: document.getElementById('inpIngredients').value.split('\n').filter(x=>x.trim()),
             instructions: document.getElementById('inpInstructions').value.split('\n').filter(x=>x.trim()),
@@ -1143,7 +1383,7 @@
                 carb: document.getElementById('inpCarb').value,
                 fat: document.getElementById('inpFat').value
             },
-            notes: recipes.find(r => r.id === document.getElementById('editId').value)?.notes || "" // Preserve notes on edit
+            notes: recipes.find(r => r.id === document.getElementById('editId').value)?.notes || "" 
         };
         if(document.getElementById('editId').value) d.id = document.getElementById('editId').value;
         saveRecipe(d);
@@ -1166,7 +1406,7 @@
     
     // Search & Filter
     document.getElementById('searchInput').oninput = renderRecipeList;
-    document.getElementById('categoryFilter').onchange = renderRecipeList;
+    // Tag Filter is now handled by buttons in renderTagFilters()
     
     // Servings Scaling
     document.getElementById('detDesiredServings').oninput = (e) => {
@@ -1180,26 +1420,30 @@
             try {
                 await updateDoc(doc(db, 'recipes', activeRecipeId), { notes: e.target.value });
                 const r = recipes.find(x=>x.id===activeRecipeId);
-                if(r) r.notes = e.target.value; // Update local state
+                if(r) r.notes = e.target.value; 
             } catch(error) { console.error("Failed to save notes:", error); alert("Failed to save notes. Check Firebase rules."); }
         }
     };
 
     document.getElementById('btnPrint').onclick = () => window.print();
 
-    // Add New Category
+    // Add New Category (now adds new Tag)
     document.getElementById('btnAddCat').onclick = async () => {
-        const val = document.getElementById('inpNewCat').value.trim();
-        if(val && !categories.includes(val)) {
-            categories.push(val); categories.sort();
-            await setDoc(doc(db, 'appData', 'categories'), { list: categories });
-            renderCategories(); 
-            document.getElementById('inpCategory').value = val; // Select the new category
-            document.getElementById('inpNewCat').value = ''; 
+        const inputField = document.getElementById('inpNewCat');
+        const val = inputField.value.trim();
+        if(val && !allTags.includes(val)) {
+            allTags.push(val);
+            allTags.sort();
+            await saveGlobalTags(); 
+            // The tag input is 'inpTags', not 'inpCategory'
+            // We could add this new tag directly to the current recipe's tags if needed
+            // For now, just making it available.
+            inputField.value = ''; // Clear new tag input
         } else if (val) {
-            alert(`Category "${val}" already exists.`);
+            alert(`Tag "${val}" already exists.`);
         }
     };
+
 
     // Meal Plan Week Select
     document.getElementById('mealPlanWeekSelect').onchange = () => { 
@@ -1232,9 +1476,24 @@
                 await updateDoc(doc(db, 'recipes', activeRecipeId), { rating: parseInt(v) });
                 const r = recipes.find(x=>x.id===activeRecipeId);
                 if(r) r.rating = parseInt(v); 
-                renderRecipeList(); // Update main list to reflect new rating
+                renderRecipeList(); 
             } catch(error) { console.error("Failed to update rating:", error); alert("Failed to update rating. Check Firebase rules."); }
         }
+    };
+
+    // Shopping List Control Buttons
+    document.getElementById('checkAllBtn').onclick = () => {
+        document.querySelectorAll('#shoppingListContainer input[type="checkbox"]').forEach(checkbox => {
+            checkbox.checked = true;
+            checkbox.closest('.shopping-item').classList.add('checked');
+        });
+    };
+
+    document.getElementById('clearCheckedBtn').onclick = () => {
+        document.querySelectorAll('#shoppingListContainer input[type="checkbox"]').forEach(checkbox => {
+            checkbox.checked = false;
+            checkbox.closest('.shopping-item').classList.remove('checked');
+        });
     };
 
     init();

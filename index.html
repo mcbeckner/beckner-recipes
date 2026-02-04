@@ -210,6 +210,19 @@
         
         /* Floating Timer */
         #timerIndicator { position: fixed; bottom: 25px; right: 25px; background: var(--header-color); color: white; padding: 12px 20px; border-radius: 50px; font-weight: bold; display: none; z-index: 2000; align-items: center; gap: 10px; }
+
+        /* TEMPORARY DEBUGGING INFO */
+        #debugInfo {
+            position: fixed;
+            bottom: 5px;
+            left: 5px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.8rem;
+            z-index: 9999;
+        }
     </style>
 </head>
 <body>
@@ -275,6 +288,9 @@
     <span id="timerText">Timer: 00:00</span>
     <button id="cancelTimerBtn" style="background:none; border:none; color:white; font-size:1.2rem; cursor:pointer;">✕</button>
 </div>
+
+<!-- TEMPORARY DEBUGGING INFO -->
+<div id="debugInfo">Loading...</div>
 
 <!-- ADD/EDIT MODAL -->
 <div id="recipeModal" class="modal-overlay">
@@ -460,31 +476,30 @@
 
     // --- INIT ---
     async function init() {
-        console.log("App initializing...");
+        updateDebugInfo("Initializing...");
         await loadGlobalData();
         await loadRecipes();    
-        renderTagFilters(); // Render tags instead of categories
+        renderTagFilters(); 
         showView('recipes'); 
         if(localStorage.getItem('darkMode') === 'true') document.body.classList.add('dark-mode');
-        // Populate initial unit converter selects
         populateUnitSelects();
-        console.log("App initialized.");
+        updateDebugInfo("App initialized.");
     }
 
     async function loadGlobalData() {
         try {
-            console.log("Loading global data (favorites, mealPlan, tags)...");
+            updateDebugInfo("Loading global data...");
             const [favSnap, planSnap, tagsSnap] = await Promise.all([
                 getDoc(doc(db, 'appData', 'favorites')),
                 getDoc(doc(db, 'appData', 'mealPlan')),
-                getDoc(doc(db, 'appData', 'tags')) // Load tags instead of categories
+                getDoc(doc(db, 'appData', 'tags'))
             ]);
             favorites = favSnap.exists() ? (favSnap.data().ids || []) : [];
             mealPlan = planSnap.exists() ? (planSnap.data().plan || {}) : {};
             allTags = tagsSnap.exists() ? (tagsSnap.data().list || ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks']).sort() : ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks'].sort();
-            console.log("Global data loaded.");
+            updateDebugInfo("Global data loaded.");
         } catch(e) { 
-            console.error("Error loading global data. Initializing defaults:", e);
+            updateDebugInfo("Error loading global data: " + e.message + ". Initializing defaults.");
             favorites = [];
             mealPlan = {};
             allTags = ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks'].sort();
@@ -492,42 +507,38 @@
     }
 
     async function loadRecipes() {
+        updateDebugInfo("Loading recipes from Firestore...");
         try {
-            console.log("--- loadRecipes START ---");
             const snap = await getDocs(collection(db, 'recipes'));
-            console.log(`Firestore snapshot received. Number of docs: ${snap.docs.length}`);
+            updateDebugInfo(`Firestore snapshot received. Docs: ${snap.docs.length}`);
             
             const loadedData = snap.docs.map(d => {
                 const recipeData = d.data();
                 // Data migration logic: If an old recipe has 'category' (string), convert it to 'tags' (array)
                 if (recipeData.category && !recipeData.tags) {
-                    console.log(`Migrating category "${recipeData.category}" to tags for recipe ${d.id}`);
                     recipeData.tags = [recipeData.category];
                     delete recipeData.category; 
                 } else if (!recipeData.tags) {
-                    recipeData.tags = []; // Ensure tags array exists
+                    recipeData.tags = []; 
                 }
-                // Also ensure tags is an array, even if empty
                 if (!Array.isArray(recipeData.tags)) {
                     recipeData.tags = [];
                 }
                 return { id: d.id, ...recipeData };
             });
             recipes = loadedData;
-            console.log(`Successfully loaded ${recipes.length} recipes into global state.`);
-            console.log("--- loadRecipes END ---");
+            updateDebugInfo(`Loaded ${recipes.length} recipes. Current View: ${document.querySelector('.view-toggle button.active')?.id || 'none'}`);
         } catch(e) { 
-            console.error("FAILED to load recipes from Firestore:", e);
-            recipes = []; // Ensure state is empty on error
+            updateDebugInfo("FAILED to load recipes: " + e.message + ". Check Firestore rules!");
+            recipes = []; 
         }
     }
 
     // --- TAG RENDERING AND MANAGEMENT ---
     function renderTagFilters() {
         const tagFilterContainer = document.getElementById('tagFilterContainer');
-        tagFilterContainer.innerHTML = ''; // Clear previous buttons
+        tagFilterContainer.innerHTML = ''; 
         
-        // "All Tags" button
         const allTagsBtn = document.createElement('button');
         allTagsBtn.className = `tag-filter-btn ${selectedTagsFilter.size === 0 ? 'active' : ''}`;
         allTagsBtn.textContent = 'All Tags';
@@ -538,7 +549,6 @@
         };
         tagFilterContainer.appendChild(allTagsBtn);
 
-        // Individual tag buttons
         allTags.forEach(tag => {
             const btn = document.createElement('button');
             btn.className = `tag-filter-btn ${selectedTagsFilter.has(tag) ? 'active' : ''}`;
@@ -549,13 +559,12 @@
                 } else {
                     selectedTagsFilter.add(tag);
                 }
-                renderTagFilters(); // Re-render to update active state
+                renderTagFilters(); 
                 renderRecipeList();
             };
             tagFilterContainer.appendChild(btn);
         });
 
-        // Also update datalist for input tags (for autocompletion)
         const availableTagsDatalist = document.getElementById('availableTags');
         availableTagsDatalist.innerHTML = '';
         allTags.forEach(tag => {
@@ -568,37 +577,36 @@
     async function saveGlobalTags() {
         try {
             await setDoc(doc(db, 'appData', 'tags'), { list: allTags });
-            renderTagFilters(); // Re-render tag filter buttons and datalist
-            console.log("Tags saved to Cloud.");
-        } catch(e) { console.error("Failed to save tags to Cloud:", e); }
+            renderTagFilters(); 
+            updateDebugInfo("Tags saved to Cloud.");
+        } catch(e) { updateDebugInfo("Failed to save tags: " + e.message); }
     }
 
     // --- RECIPE LIST RENDERING ---
     function renderRecipeList() {
-        console.log(`renderRecipeList() called. Current recipes.length: ${recipes.length}`);
+        updateDebugInfo(`Rendering recipe list. Recipes in state: ${recipes.length}`);
         const container = document.getElementById('recipeList');
         container.innerHTML = '';
         const term = document.getElementById('searchInput').value.toLowerCase();
         
         const filtered = recipes.filter(r => {
             const matchesSearch = !term || r.title.toLowerCase().includes(term) || (r.ingredients && r.ingredients.some(i => i.toLowerCase().includes(term)));
-            
-            // Tag filtering: if no tags selected, all pass. If tags selected, recipe must have AT LEAST ONE of the selected tags.
             const matchesTags = selectedTagsFilter.size === 0 || r.tags.some(tag => selectedTagsFilter.has(tag));
-            
             return matchesSearch && matchesTags;
         });
         document.getElementById('emptyMessage').style.display = filtered.length ? 'none' : 'block';
         filtered.forEach(r => container.appendChild(createRecipeCard(r)));
+        updateDebugInfo(`Recipe list rendered. Displaying ${filtered.length} items.`);
     }
     
     function renderFavoritesList() {
-        console.log(`renderFavoritesList() called. Current recipes.length: ${recipes.length}`);
+        updateDebugInfo(`Rendering favorites list. Recipes in state: ${recipes.length}`);
         const container = document.getElementById('favoritesList');
         container.innerHTML = '';
         const list = recipes.filter(r => favorites.includes(r.id));
         document.getElementById('emptyFavMessage').style.display = list.length ? 'none' : 'block';
         list.forEach(r => container.appendChild(createRecipeCard(r)));
+        updateDebugInfo(`Favorites list rendered. Displaying ${list.length} items.`);
     }
 
 
@@ -621,8 +629,7 @@
         div.onclick = () => openDetail(r);
         div.addEventListener('dragstart', (e) => {
             e.dataTransfer.setData('text/plain', r.id);
-            e.dataTransfer.setData('source-type', 'list'); // Indicate drag is from recipe list (copy)
-            console.log(`Dragstart from list: Recipe ID ${r.id}, Source Type 'list'`);
+            e.dataTransfer.setData('source-type', 'list'); 
         });
         return div;
     }
@@ -661,7 +668,6 @@
             document.getElementById('inpSource').value = foundRecipe.url || "";
             document.getElementById('inpServings').value = parseInt(foundRecipe.recipeYield) || 4;
 
-            // Tags: attempt to extract keywords as tags
             let importedTags = [];
             if (foundRecipe.keywords) {
                 importedTags = Array.isArray(foundRecipe.keywords) ? foundRecipe.keywords : foundRecipe.keywords.split(',').map(t => t.trim());
@@ -700,16 +706,16 @@
             }
 
             alert("Recipe data parsed! Please review and select tags before saving.");
-            document.getElementById('inpImportJson').value = ''; // Clear the textarea
+            document.getElementById('inpImportJson').value = ''; 
         } catch (error) {
             alert("Error parsing JSON: " + error.message + "\nPlease ensure you've pasted valid JSON-LD.");
-            console.error("JSON-LD parse error:", error);
+            updateDebugInfo("JSON-LD parse error: " + error.message);
         }
     };
 
     // --- MEAL PLAN & SHOPPING ---
     function renderMealPlanGrid() {
-        console.log("Rendering meal plan grid...");
+        updateDebugInfo("Rendering meal plan grid...");
         const grid = document.getElementById('mealPlanGrid');
         grid.innerHTML = '';
         const week = document.getElementById('mealPlanWeekSelect').value;
@@ -756,52 +762,45 @@
                 const sourceType = e.dataTransfer.getData('source-type'); 
                 const sourceDayKey = e.dataTransfer.getData('source-day'); 
                 
-                console.log(`Drop event: Recipe ID ${recipeId}, Source Type '${sourceType}', Source Day '${sourceDayKey}', Target Day '${dayKey}'`);
-
                 if (!recipeId) {
-                    console.log("No recipe ID in dataTransfer, ignoring drop.");
+                    updateDebugInfo("No recipe ID in dataTransfer, ignoring drop.");
                     return;
                 }
 
                 if (!mealPlan[dayKey]) mealPlan[dayKey] = [];
 
-                // Handle MOVE operation (from one meal plan day to another)
                 if (sourceType === 'plan' && sourceDayKey && sourceDayKey !== dayKey) {
-                    console.log(`Performing MOVE: Removing from ${sourceDayKey}, adding to ${dayKey}`);
+                    updateDebugInfo(`Performing MOVE: Removing from ${sourceDayKey}, adding to ${dayKey}`);
                     mealPlan[sourceDayKey] = mealPlan[sourceDayKey].filter(id => id !== recipeId);
                     if (mealPlan[sourceDayKey].length === 0) delete mealPlan[sourceDayKey]; 
                     
                     if (!mealPlan[dayKey].includes(recipeId)) {
                         const newOrder = Array.from(content.children).map(el => el.dataset.recipeId);
-                        // Make sure recipeId is actually in newOrder if it's not a duplicate copy
                         if (!newOrder.includes(recipeId)) {
                             mealPlan[dayKey] = newOrder.concat(recipeId);
                         } else {
-                            mealPlan[dayKey] = newOrder; // Just update order
+                            mealPlan[dayKey] = newOrder;
                         }
                     } else {
-                        console.log(`Recipe ${recipeId} already exists in target day ${dayKey}. Reordering only.`);
                         const newOrder = Array.from(content.children).map(el => el.dataset.recipeId);
                         mealPlan[dayKey] = newOrder;
                     }
                 } 
-                // Handle COPY operation (from the main recipe list)
                 else if (sourceType === 'list') {
-                    console.log(`Performing COPY: Adding to ${dayKey} from main list.`);
+                    updateDebugInfo(`Performing COPY: Adding to ${dayKey} from main list.`);
                     if (mealPlan[dayKey].includes(recipeId)) {
                         alert("Recipe already on this day's plan.");
                     } else {
                         const newOrder = Array.from(content.children).map(el => el.dataset.recipeId);
-                        mealPlan[dayKey] = newOrder.filter(id => id !== recipeId).concat(recipeId); // Add at the end or at drop position
+                        mealPlan[dayKey] = newOrder.filter(id => id !== recipeId).concat(recipeId); 
                     }
                 } 
-                // Handle reordering within the same day
                 else if (sourceType === 'plan' && sourceDayKey === dayKey) {
-                    console.log(`Performing REORDER within ${dayKey}`);
+                    updateDebugInfo(`Performing REORDER within ${dayKey}`);
                     const newOrder = Array.from(content.children).map(el => el.dataset.recipeId);
                     mealPlan[dayKey] = newOrder;
                 } else {
-                    console.log("Drop event occurred, but no specific action taken based on source type or day.");
+                    updateDebugInfo("Drop event occurred, but no specific action taken based on source type or day.");
                 }
                 
                 document.querySelectorAll('.meal-card.dragging').forEach(el => el.classList.remove('dragging'));
@@ -822,13 +821,13 @@
         const card = document.createElement('div');
         card.className = 'meal-card';
         card.draggable = true;
-        card.dataset.recipeId = r.id; // Store recipe ID
+        card.dataset.recipeId = r.id; 
         
         card.innerHTML = `<img src="${r.imageData || 'https://via.placeholder.com/150x90?text=Food'}" loading="lazy"><div class="meal-card-title">${r.title}</div><button class="remove-meal-btn">✕</button>`;
         
         card.querySelector('.remove-meal-btn').onclick = async (e) => {
             e.stopPropagation();
-            console.log(`Removing recipe ${r.id} from day ${dayKey}`);
+            updateDebugInfo(`Removing recipe ${r.id} from day ${dayKey}`);
             mealPlan[dayKey] = mealPlan[dayKey].filter(x => x !== r.id);
             if (mealPlan[dayKey].length === 0) delete mealPlan[dayKey]; 
             await setDoc(doc(db, 'appData', 'mealPlan'), { plan: mealPlan });
@@ -837,14 +836,13 @@
         
         card.addEventListener('dragstart', (e) => {
             e.dataTransfer.setData('text/plain', r.id);
-            e.dataTransfer.setData('source-type', 'plan'); // Indicate drag is from meal plan (move potential)
-            e.dataTransfer.setData('source-day', dayKey); // Store source day key
-            e.target.classList.add('dragging'); // Add class to the dragged item
-            console.log(`Dragstart from meal plan: Recipe ID ${r.id}, Source Type 'plan', Source Day '${dayKey}'`);
+            e.dataTransfer.setData('source-type', 'plan'); 
+            e.dataTransfer.setData('source-day', dayKey); 
+            e.target.classList.add('dragging'); 
         });
 
         card.addEventListener('dragend', (e) => {
-            e.target.classList.remove('dragging'); // Remove class when drag ends
+            e.target.classList.remove('dragging'); 
         });
         
         card.onclick = () => openDetail(r);
@@ -899,9 +897,8 @@
 
     // --- SMART SHOPPING & FRACTIONS ---
 
-    const quantityRegex = /^(\d+(?:\.\d+)?|\d+\s*\d*\/\d+|\d+\/\d+)/; // Matches "1", "0.5", "1 1/2", "1/2"
+    const quantityRegex = /^(\d+(?:\.\d+)?|\d+\s*\d*\/\d+|\d+\/\d+)/; 
     
-    // Comprehensive list of unit variations and their normalized singular forms
     const unitMap = {
         'tsp': 'teaspoon', 'tsps': 'teaspoon', 't': 'teaspoon', 'teaspoon': 'teaspoon', 'teaspoons': 'teaspoon',
         'tbsp': 'tablespoon', 'tbsps': 'tablespoon', 'T': 'tablespoon', 'tablespoon': 'tablespoon', 'tablespoons': 'tablespoon',
@@ -910,7 +907,7 @@
         'ml': 'milliliter', 'milliliter': 'milliliter', 'milliliters': 'milliliter',
         'l': 'liter', 'liter': 'liter', 'liters': 'liter',
         'g': 'gram', 'gram': 'gram', 'grams': 'gram',
-        'oz_w': 'ounce', 'oz': 'ounce', 'ounce': 'ounce', 'ounces': 'ounce', // oz (weight)
+        'oz_w': 'ounce', 'oz': 'ounce', 'ounce': 'ounce', 'ounces': 'ounce', 
         'lb': 'pound', 'lbs': 'pound', 'pound': 'pound', 'pounds': 'pound',
         'kg': 'kilogram', 'kilogram': 'kilogram', 'kilograms': 'kilogram',
         'pinch': 'pinch', 'pinches': 'pinch', 'dash': 'dash', 'dashes': 'dash',
@@ -935,12 +932,11 @@
         'packed', 'heaping', 'lightly packed', 'loose', 'a', 'an', 'the', 'some',
         'good quality', 'best quality', 'superfine', 'blanched', 'confectioners', 'powdered',
         'a pinch of', 'a dash of', 'a sprinkle of', 'a couple of', 'toasted', 'roasted', 'cooked', 'raw',
-        'organic', 'farm-fresh', 'aged', 'filtered', 'divided', 'such as', 'plus more for dusting', 'plus more for serving', 'for pan', 'for coating',
+        'organic', 'farm-fresh', 'aged', 'filtered', 'divided', 'such as',
         'or more', 'or less', 'about', 'approximately', 'small', 'medium', 'large', 'jumbo', 'extra large', 'tiny', 'baby',
-        'for serving', 'for garnish', 'as needed', 'to taste', 'optional', 'and' // 'and' is a common connector, might be stripped
+        'for serving', 'for garnish', 'as needed', 'to taste', 'optional', 'plus more for dusting', 'plus more for serving', 'for pan', 'for coating'
     ];
 
-    // Default aisle mapping (you can expand this list!)
     const defaultAisleMap = {
         'flour': 'Baking', 'sugar': 'Baking', 'baking powder': 'Baking', 'baking soda': 'Baking', 'vanilla extract': 'Baking',
         'butter': 'Dairy', 'milk': 'Dairy', 'cheese': 'Dairy', 'yogurt': 'Dairy', 'eggs': 'Dairy', 'cream': 'Dairy',
@@ -952,24 +948,19 @@
     };
 
     function getAisleSuggestion(ingredientName) {
-        // First, check if the ingredient has an explicit aisle defined by the user (e.g., "2 cups flour // Baking")
         const aisleMatch = ingredientName.match(/(\s*\/\/\s*)([^/]+)$/);
         if (aisleMatch && aisleMatch[2]) {
-            // Capitalize first letter of each word in the aisle name
             return aisleMatch[2].trim().replace(/\s{2,}/g, ' ').replace(/(^|\s)\S/g, l => l.toUpperCase()); 
         }
 
-        // If not, use the default map
-        // Iterate over keys in reverse order to prioritize more specific matches (e.g., "bell pepper" before "pepper")
         const sortedMapKeys = Object.keys(defaultAisleMap).sort((a, b) => b.length - a.length);
         for (const key of sortedMapKeys) {
-            // Use word boundary to avoid matching "pepper" in "bell pepper" if "bell pepper" is a key
             const keyRegex = new RegExp(`\\b${key}\\b`, 'i');
             if (keyRegex.test(ingredientName)) {
                 return defaultAisleMap[key];
             }
         }
-        return 'Other'; // Fallback
+        return 'Other'; 
     }
 
     function normalizeIngredientName(ingredientString) {
@@ -980,13 +971,11 @@
 
         let remaining = original;
 
-        // Strip user-defined aisle hint before parsing quantities/units
         const aisleHintRemovedMatch = remaining.match(/^(.*?)(?:\s*\/\/\s*[^/]+)$/);
         if (aisleHintRemovedMatch) {
             remaining = aisleHintRemovedMatch[1].trim();
         }
 
-        // 1. Try to extract Quantity
         const qtyMatch = remaining.match(quantityRegex);
         if (qtyMatch) {
             let qtyStr = qtyMatch[1].trim();
@@ -1008,7 +997,6 @@
             quantity = 1; 
         }
 
-        // 2. Try to extract Unit
         const sortedUnits = Object.keys(unitMap).sort((a, b) => b.length - a.length);
         
         for (const u of sortedUnits) {
@@ -1016,7 +1004,7 @@
             const matchInRemaining = remaining.match(unitMatchRegex);
 
             if (matchInRemaining) {
-                unit = unitMap[u]; // Use normalized unit
+                unit = unitMap[u]; 
                 remaining = remaining.substring(matchInRemaining[0].length).trim();
                 break; 
             }
@@ -1024,7 +1012,6 @@
 
         let name = remaining;
 
-        // 3. Strip common descriptors from the name
         let cleanedName = name;
         commonDescriptors.forEach(desc => {
             const descPattern = new RegExp(`(?:^|,|\\s)\\b${desc}\\b(?:$|,|\\s)`, 'gi');
@@ -1055,7 +1042,6 @@
         };
     }
 
-    // Helper for displaying fractions nicely
     function formatFraction(d) {
         if (typeof d !== 'number' || isNaN(d) || d === 0) return "0";
         const tolerance = 0.005; 
@@ -1088,7 +1074,7 @@
     }
 
     function renderShoppingList() {
-        console.log("Rendering shopping list...");
+        updateDebugInfo("Rendering shopping list...");
         const div = document.getElementById('shoppingListContainer');
         div.innerHTML = '';
         const week = document.getElementById('mealPlanWeekSelect').value;
@@ -1111,7 +1097,6 @@
         allIngredientsRaw.forEach(line => {
             const parsed = normalizeIngredientName(line);
 
-            // Create a consistent aggregation key: "name (unit)"
             let aggKey = parsed.name;
             if (parsed.unit) {
                 aggKey += ` (${parsed.unit})`;
@@ -1123,7 +1108,6 @@
             aggregatedIngredients[aggKey].quantity += parsed.quantity;
         });
 
-        // Group by aisle
         const itemsByAisle = {};
         Object.values(aggregatedIngredients).forEach(item => {
             const aisleName = item.aisle || 'Other';
@@ -1133,10 +1117,9 @@
             itemsByAisle[aisleName].push(item);
         });
 
-        // Sort aisles for display
         const customAisleOrder = [
             'Produce', 'Bakery', 'Meat & Seafood', 'Dairy', 'Frozen', 'Pantry', 'Baking', 
-            'Spices & Seasonings', 'Canned Goods', 'Beverages', 'Other' // Adjusted order for common grocery flow
+            'Spices & Seasonings', 'Canned Goods', 'Beverages', 'Other'
         ];
         const sortedAisles = Object.keys(itemsByAisle).sort((a, b) => {
             const indexA = customAisleOrder.indexOf(a);
@@ -1148,7 +1131,6 @@
         });
 
 
-        // Render grouped and sorted list
         sortedAisles.forEach(aisle => {
             const aisleGroupDiv = document.createElement('div');
             aisleGroupDiv.className = 'aisle-group';
@@ -1180,7 +1162,7 @@
             });
             div.appendChild(aisleGroupDiv);
         });
-        console.log("Shopping list rendered.");
+        updateDebugInfo("Shopping list rendered.");
     }
 
 
@@ -1194,12 +1176,14 @@
 
     async function deleteRecipe(id) {
         if(!confirm("Permanently delete this recipe?")) return;
+        updateDebugInfo(`Attempting to delete recipe ID: ${id}`);
         const recipeToDelete = recipes.find(r => r.id === id);
         try {
             if (recipeToDelete && recipeToDelete.imageData && recipeToDelete.imageData.startsWith('https://firebasestorage.googleapis.com/')) {
-                try { await deleteObject(ref(storage, recipeToDelete.imageData)); } catch (err) { console.warn("Image deletion failed:", err); }
+                try { await deleteObject(ref(storage, recipeToDelete.imageData)); updateDebugInfo("Image deleted from storage."); } catch (err) { updateDebugInfo("Image deletion failed: " + err.message); }
             }
             await deleteDoc(doc(db, 'recipes', id));
+            updateDebugInfo("Recipe document deleted from Firestore.");
             
             favorites = favorites.filter(x => x !== id); await setDoc(doc(db,'appData','favorites'), {ids:favorites});
             
@@ -1212,6 +1196,7 @@
                 }
             });
             if(mealPlanChanged) await setDoc(doc(db, 'appData', 'mealPlan'), { plan: mealPlan });
+            updateDebugInfo("Meal plan updated.");
 
             await loadRecipes(); 
             const activeViewBtn = document.querySelector('.view-toggle button.active');
@@ -1221,40 +1206,43 @@
             } else {
                 showView('recipes'); 
             }
-            // Close the detail modal if recipe was deleted from there
             if (document.getElementById('detailModal').classList.contains('active')) {
                 document.getElementById('detailModal').classList.remove('active');
             }
-        } catch (e) { alert("Error deleting recipe."); console.error(e); }
+            updateDebugInfo("Recipe deletion complete. UI refreshed.");
+        } catch (e) { alert("Error deleting recipe: " + e.message); updateDebugInfo("Error deleting recipe: " + e.message); }
     }
 
     async function saveRecipe(data) {
         const btn = document.getElementById('btnSave'); btn.textContent="Saving..."; btn.disabled=true;
+        updateDebugInfo(`Saving recipe: ${data.title}`);
         try {
             if(currentImageFile) {
                 const snap = await uploadString(ref(storage, `img_${Date.now()}`), currentImageFile, 'data_url');
                 data.imageData = await getDownloadURL(snap.ref);
+                updateDebugInfo("Image uploaded.");
             } else if (data.id) { 
                 const old = recipes.find(r=>r.id===data.id);
                 if(old) data.imageData = old.imageData;
             }
             
-            // Add new tags to the global list if they don't exist
             data.tags.forEach(tag => {
                 if (!allTags.includes(tag)) {
                     allTags.push(tag);
                 }
             });
-            allTags.sort(); // Keep tags sorted
+            allTags.sort(); 
 
             if(data.id) await updateDoc(doc(db,'recipes',data.id), data);
             else await addDoc(collection(db,'recipes'), data);
+            updateDebugInfo("Recipe saved to Firestore.");
             
-            await saveGlobalTags(); // Save updated global tags list
+            await saveGlobalTags(); 
             await loadRecipes();
             showView('recipes');
             document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('active'));
-        } catch(e) { alert("Save Error"); console.error(e); }
+            updateDebugInfo("Recipe save complete. UI refreshed.");
+        } catch(e) { alert("Save Error: " + e.message); updateDebugInfo("Save Error: " + e.message); }
         btn.textContent="Save Recipe"; btn.disabled=false;
     }
 
@@ -1263,7 +1251,6 @@
         activeRecipeId = r.id; 
         document.getElementById('detTitle').textContent = r.title;
         
-        // Tags display
         const detTagsDiv = document.getElementById('detTags');
         detTagsDiv.innerHTML = '';
         if (r.tags && r.tags.length > 0) {
@@ -1309,8 +1296,8 @@
         });
 
         document.getElementById('detailModal').classList.add('active');
-        // Set the recipe ID for the detail delete button
         document.getElementById('btnDeleteRecipeDetail').dataset.recipeId = r.id; 
+        convertUnits(); // Initialize converter with default values
     }
 
     function renderIngredientsInDetail(r, scale) {
@@ -1349,19 +1336,18 @@
     // --- UNIT CONVERSION LOGIC ---
 
     const CONVERSION_FACTORS = {
-        // All units convert to a base unit (ml for volume, g for weight)
         volume: {
-            'tsp': 4.92892, // 1 tsp = 4.92892 ml
-            'tbsp': 14.7868, // 1 tbsp = 14.7868 ml
-            'cup': 236.588, // 1 cup = 236.588 ml
-            'floz': 29.5735, // 1 fl oz = 29.5735 ml
+            'tsp': 4.92892, 
+            'tbsp': 14.7868, 
+            'cup': 236.588, 
+            'floz': 29.5735, 
             'ml': 1,
             'l': 1000
         },
         weight: {
             'g': 1,
-            'oz_w': 28.3495, // 1 oz (weight) = 28.3495 g
-            'lb': 453.592, // 1 lb = 453.592 g
+            'oz_w': 28.3495, 
+            'lb': 453.592, 
             'kg': 1000
         }
     };
@@ -1373,11 +1359,9 @@
         outputSelect.innerHTML = '';
 
         const unitsOrdered = [
-            // Volume
             {value: 'tsp', text: 'tsp'}, {value: 'tbsp', text: 'tbsp'},
             {value: 'cup', text: 'cup'}, {value: 'floz', text: 'fl oz'},
             {value: 'ml', text: 'ml'}, {value: 'l', text: 'L'},
-            // Weight
             {value: 'g', text: 'g'}, {value: 'oz_w', text: 'oz (weight)'},
             {value: 'lb', text: 'lb'}, {value: 'kg', text: 'kg'}
         ];
@@ -1394,7 +1378,6 @@
             outputSelect.appendChild(option2);
         });
 
-        // Set default selections
         inputSelect.value = 'tbsp';
         outputSelect.value = 'cup';
     }
@@ -1412,7 +1395,7 @@
         const outputSpan = document.getElementById('convertOutputQty');
 
         if (isNaN(qty) || qty <= 0) {
-            outputSpan.textContent = "0"; // Display 0 for invalid input
+            outputSpan.textContent = "0"; 
             return;
         }
 
@@ -1434,6 +1417,15 @@
 
         outputSpan.textContent = convertedValue.toFixed(2);
     }
+
+    // --- DEBUG INFO DISPLAY ---
+    function updateDebugInfo(message) {
+        const debugDiv = document.getElementById('debugInfo');
+        if (debugDiv) {
+            debugDiv.textContent = `Debug: ${message}`;
+        }
+    }
+
 
     // --- EVENT LISTENERS ---
     
@@ -1482,7 +1474,7 @@
         document.getElementById(`view${v.charAt(0).toUpperCase()+v.slice(1)}Btn`).onclick = () => showView(v);
     });
     function showView(v) {
-        console.log(`Showing view: ${v}`);
+        updateDebugInfo(`Showing view: ${v}`);
         document.querySelectorAll('.view-toggle button').forEach(b=>b.classList.remove('active'));
         document.getElementById(`view${v.charAt(0).toUpperCase()+v.slice(1)}Btn`).classList.add('active');
         ['recipes','mealPlan','shopping','favorites'].forEach(x=>document.getElementById(`${x}View`).style.display='none');
@@ -1575,7 +1567,7 @@
                 reader.onloadend = () => { currentImageFile = reader.result; };
                 reader.readAsDataURL(result);
             },
-            error(err) { alert("Image compression failed. Please try a different image or smaller file size."); console.error("Image compression error:", err); }
+            error(err) { alert("Image compression failed. Please try a different image or smaller file size."); updateDebugInfo("Image compression error: " + err.message); }
         });
     };
     
@@ -1595,7 +1587,8 @@
                 await updateDoc(doc(db, 'recipes', activeRecipeId), { notes: e.target.value });
                 const r = recipes.find(x=>x.id===activeRecipeId);
                 if(r) r.notes = e.target.value; 
-            } catch(error) { console.error("Failed to save notes:", error); alert("Failed to save notes. Check Firebase rules."); }
+                updateDebugInfo("Notes saved.");
+            } catch(error) { updateDebugInfo("Failed to save notes: " + error.message); alert("Failed to save notes. Check Firebase rules."); }
         }
     };
 
@@ -1647,7 +1640,7 @@
                 const r = recipes.find(x=>x.id===activeRecipeId);
                 if(r) r.rating = parseInt(v); 
                 renderRecipeList(); 
-            } catch(error) { console.error("Failed to update rating:", error); alert("Failed to update rating. Check Firebase rules."); }
+            } catch(error) { updateDebugInfo("Failed to update rating: " + error.message); alert("Failed to update rating. Check Firebase rules."); }
         }
     };
 

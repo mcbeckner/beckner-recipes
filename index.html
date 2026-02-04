@@ -78,11 +78,15 @@
         /* Grid & Cards */
         #recipeList, #favoritesList { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; }
         .recipe-item { background: var(--card-bg); border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px var(--shadow-color); position: relative; cursor: pointer; border: 1px solid var(--border-color); }
+        .recipe-item:hover { transform: translateY(-4px); }
         .recipe-item img { width: 100%; height: 180px; object-fit: cover; }
         .recipe-item h3 { padding: 15px; margin: 0; font-size: 1.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .card-actions { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; }
-        .card-btn { background: rgba(255,255,255,0.95); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; cursor: pointer; border: none; }
+        .card-btn { background: rgba(255,255,255,0.95); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; cursor: pointer; border: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
         .card-btn.fav.active { color: var(--fav-color-filled); }
+        .card-btn.delete { color: var(--button-danger); }
+
 
         /* Meal Plan */
         .meal-plan-calendar { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
@@ -134,6 +138,30 @@
         .nutri-pill { text-align: center; background: var(--bg-color); padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); }
         .nutri-pill span { display: block; font-size: 0.8rem; opacity: 0.8; }
         .nutri-pill strong { font-size: 1.1rem; color: var(--button-primary); }
+
+        /* Unit Converter */
+        .conversion-tool {
+            padding: 15px;
+            background: var(--bg-color);
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap; /* Allow wrapping on smaller screens */
+        }
+        .conversion-tool h4 { margin: 0; width: 100%; font-size: 1rem; color: var(--header-color); }
+        .conversion-tool input, .conversion-tool select {
+            flex: 1; /* Allow them to grow */
+            min-width: 80px; /* Minimum width for readability */
+            margin-bottom: 0; /* Override default input margin */
+            font-size: 0.9rem;
+            padding: 6px 8px;
+        }
+        .conversion-tool span { font-weight: bold; }
+        .conversion-tool button { padding: 6px 10px; font-size: 0.9rem; }
+
 
         /* Modals */
         .modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.75); display: none; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(3px); }
@@ -207,9 +235,8 @@
         <button class="primary-btn" id="openAddModalBtn">+ Add Recipe</button>
         <input type="text" id="searchInput" placeholder="Search..." style="margin:0; flex-grow:1;">
         
-        <!-- TAG FILTER - Replaces category filter -->
+        <!-- TAG FILTER -->
         <div id="tagFilterContainer" class="tag-filter-container">
-            <!-- Dynamic tag buttons will go here -->
             <button class="tag-filter-btn" data-tag="all" id="allTagsBtn">All Tags</button>
         </div>
     </div>
@@ -268,7 +295,7 @@
                 <input type="text" id="inpTitle" placeholder="Recipe Title" required>
                 <input type="url" id="inpSource" placeholder="Source URL">
                 
-                <!-- TAGS INPUT - Replaces category select -->
+                <!-- TAGS INPUT -->
                 <label style="margin-top:10px; display:block; font-weight:bold;">Tags (comma-separated):</label>
                 <input type="text" id="inpTags" placeholder="e.g., Dinner, Quick, Vegetarian" list="availableTags">
                 <datalist id="availableTags"></datalist>
@@ -320,11 +347,14 @@
     <div class="modal-content">
         <div class="modal-header">
             <h2 id="detTitle" style="margin:0;">Recipe Title</h2>
-            <button class="close-modal close-detail-modal">&times;</button>
+            <div style="display:flex; gap:10px;">
+                 <button id="btnDeleteRecipeDetail" class="primary-btn" style="background: var(--button-danger); padding:4px 10px; font-size:0.8rem;">Delete</button>
+                 <button class="close-modal close-detail-modal">&times;</button>
+            </div>
         </div>
         
         <div class="detail-meta-bar">
-            <!-- TAGS DISPLAY - Replaces category display -->
+            <!-- TAGS DISPLAY -->
             <div id="detTags" class="tag-filter-container">
                 <!-- Tags will be dynamically inserted here -->
             </div>
@@ -359,6 +389,39 @@
                 </div>
             </div>
             <div class="split-col right">
+                <!-- UNIT CONVERTER -->
+                <div class="conversion-tool">
+                    <h4>Unit Converter</h4>
+                    <input type="number" id="convertInputQty" value="1" min="0.01" step="0.01">
+                    <select id="convertInputUnit">
+                        <option value="tsp">tsp</option>
+                        <option value="tbsp">tbsp</option>
+                        <option value="cup">cup</option>
+                        <option value="floz">fl oz</option>
+                        <option value="ml">ml</option>
+                        <option value="l">L</option>
+                        <option value="g">g</option>
+                        <option value="oz_w">oz (weight)</option>
+                        <option value="lb">lb</option>
+                        <option value="kg">kg</option>
+                    </select>
+                    <span>=</span>
+                    <span id="convertOutputQty">0</span>
+                    <select id="convertOutputUnit">
+                        <option value="tbsp">tbsp</option>
+                        <option value="cup">cup</option>
+                        <option value="floz">fl oz</option>
+                        <option value="ml">ml</option>
+                        <option value="l">L</option>
+                        <option value="g">g</option>
+                        <option value="oz_w">oz (weight)</option>
+                        <option value="lb">lb</option>
+                        <option value="kg">kg</option>
+                        <option value="tsp">tsp</option>
+                    </select>
+                    <button class="primary-btn" id="convertBtn">Convert</button>
+                </div>
+
                 <h3 style="border-bottom: 2px solid var(--header-color); padding-bottom:5px; margin-top:0;">Instructions</h3>
                 <div id="detInstructions"></div>
                 <h3 style="margin-top:30px;">Notes</h3>
@@ -391,8 +454,8 @@
 
     // --- STATE ---
     let recipes = [], favorites = [], mealPlan = {};
-    let allTags = []; // Replaces 'categories'
-    let selectedTagsFilter = new Set(); // For filtering recipes by tags
+    let allTags = []; 
+    let selectedTagsFilter = new Set(); 
     let currentImageFile = null, activeRecipeId = null, currentTimer = null;
 
     // --- INIT ---
@@ -403,6 +466,8 @@
         renderTagFilters(); // Render tags instead of categories
         showView('recipes'); 
         if(localStorage.getItem('darkMode') === 'true') document.body.classList.add('dark-mode');
+        // Populate initial unit converter selects
+        populateUnitSelects();
         console.log("App initialized.");
     }
 
@@ -416,7 +481,7 @@
             ]);
             favorites = favSnap.exists() ? (favSnap.data().ids || []) : [];
             mealPlan = planSnap.exists() ? (planSnap.data().plan || {}) : {};
-            allTags = tagsSnap.exists() ? (tagsSnap.data().list || []).sort() : ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks'].sort();
+            allTags = tagsSnap.exists() ? (tagsSnap.data().list || ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks']).sort() : ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks'].sort();
             console.log("Global data loaded.");
         } catch(e) { 
             console.error("Error loading global data. Initializing defaults:", e);
@@ -435,9 +500,11 @@
                 // IMPORTANT: Data migration/standardization on load
                 // If an old recipe has 'category' (string), convert it to 'tags' (array)
                 if (recipeData.category && !recipeData.tags) {
+                    console.log(`Migrating category "${recipeData.category}" to tags for recipe ${d.id}`);
                     recipeData.tags = [recipeData.category];
-                    delete recipeData.category; // Optionally delete old field
-                    // Note: This only changes local state. To persist, you'd need to re-save the recipe.
+                    // You might want to remove the old 'category' field from Firestore if this is a one-time migration
+                    // For now, just deleting it from the local object.
+                    delete recipeData.category; 
                 } else if (!recipeData.tags) {
                     recipeData.tags = [];
                 }
@@ -451,6 +518,8 @@
     function renderTagFilters() {
         const tagFilterContainer = document.getElementById('tagFilterContainer');
         tagFilterContainer.innerHTML = ''; // Clear previous buttons
+        
+        // "All Tags" button
         const allTagsBtn = document.createElement('button');
         allTagsBtn.className = `tag-filter-btn ${selectedTagsFilter.size === 0 ? 'active' : ''}`;
         allTagsBtn.textContent = 'All Tags';
@@ -461,6 +530,7 @@
         };
         tagFilterContainer.appendChild(allTagsBtn);
 
+        // Individual tag buttons
         allTags.forEach(tag => {
             const btn = document.createElement('button');
             btn.className = `tag-filter-btn ${selectedTagsFilter.has(tag) ? 'active' : ''}`;
@@ -477,7 +547,7 @@
             tagFilterContainer.appendChild(btn);
         });
 
-        // Also update datalist for input tags
+        // Also update datalist for input tags (for autocompletion)
         const availableTagsDatalist = document.getElementById('availableTags');
         availableTagsDatalist.innerHTML = '';
         allTags.forEach(tag => {
@@ -532,10 +602,12 @@
             <img src="${r.imageData || 'https://via.placeholder.com/300x180?text=Food'}" loading="lazy">
             <div class="card-actions">
                 <button class="card-btn fav ${favorites.includes(r.id)?'active':''}" data-id="${r.id}">♥</button>
+                <button class="card-btn delete" data-id="${r.id}">🗑</button>
             </div>
             <h3>${r.title}</h3>
         `;
         div.querySelector('.fav').onclick = (e) => { e.stopPropagation(); toggleFavorite(r.id); };
+        div.querySelector('.delete').onclick = (e) => { e.stopPropagation(); deleteRecipe(r.id); }; // RESTORED DELETE
         div.onclick = () => openDetail(r);
         div.addEventListener('dragstart', (e) => {
             e.dataTransfer.setData('text/plain', r.id);
@@ -691,9 +763,16 @@
                     
                     if (!mealPlan[dayKey].includes(recipeId)) {
                         const newOrder = Array.from(content.children).map(el => el.dataset.recipeId);
-                        mealPlan[dayKey] = newOrder.filter(id => id !== recipeId).concat(recipeId); // Ensure it's added at the end if not already present
+                        // Make sure recipeId is actually in newOrder if it's not a duplicate copy
+                        if (!newOrder.includes(recipeId)) {
+                            mealPlan[dayKey] = newOrder.concat(recipeId);
+                        } else {
+                            mealPlan[dayKey] = newOrder; // Just update order
+                        }
                     } else {
                         console.log(`Recipe ${recipeId} already exists in target day ${dayKey}. Reordering only.`);
+                        const newOrder = Array.from(content.children).map(el => el.dataset.recipeId);
+                        mealPlan[dayKey] = newOrder;
                     }
                 } 
                 // Handle COPY operation (from the main recipe list)
@@ -703,7 +782,7 @@
                         alert("Recipe already on this day's plan.");
                     } else {
                         const newOrder = Array.from(content.children).map(el => el.dataset.recipeId);
-                        mealPlan[dayKey] = newOrder.filter(id => id !== recipeId).concat(recipeId); // Add at the end
+                        mealPlan[dayKey] = newOrder.filter(id => id !== recipeId).concat(recipeId); // Add at the end or at drop position
                     }
                 } 
                 // Handle reordering within the same day
@@ -715,7 +794,6 @@
                     console.log("Drop event occurred, but no specific action taken based on source type or day.");
                 }
                 
-                // Clear any dragging classes
                 document.querySelectorAll('.meal-card.dragging').forEach(el => el.classList.remove('dragging'));
 
                 await setDoc(doc(db, 'appData', 'mealPlan'), { plan: mealPlan });
@@ -822,7 +900,7 @@
         'kilogram': 'kilogram', 'kilograms': 'kilogram', 'kg': 'kilogram', 'kg.': 'kilogram',
         'milliliter': 'milliliter', 'milliliters': 'milliliter', 'ml': 'milliliter', 'ml.': 'milliliter',
         'liter': 'liter', 'liters': 'liter', 'l': 'liter', 'l.': 'liter',
-        'ounce': 'ounce', 'ounces': 'ounce', 'oz': 'ounce', 'oz.': 'ounce',
+        'ounce': 'ounce', 'ounces': 'ounce', 'oz': 'ounce', 'oz.': 'ounce', 'fl oz': 'fluid ounce', 'fluid ounce': 'fluid ounce',
         'pound': 'pound', 'pounds': 'pound', 'lb': 'pound', 'lbs': 'pound', 'lb.': 'pound', 'lbs.': 'pound',
         'pinch': 'pinch', 'pinches': 'pinch', 'dash': 'dash', 'dashes': 'dash',
         'clove': 'clove', 'cloves': 'clove', 'stalk': 'stalk', 'stalks': 'stalk',
@@ -856,21 +934,23 @@
         'flour': 'Baking', 'sugar': 'Baking', 'baking powder': 'Baking', 'baking soda': 'Baking', 'vanilla extract': 'Baking',
         'butter': 'Dairy', 'milk': 'Dairy', 'cheese': 'Dairy', 'yogurt': 'Dairy', 'eggs': 'Dairy', 'cream': 'Dairy',
         'chicken': 'Meat & Seafood', 'beef': 'Meat & Seafood', 'pork': 'Meat & Seafood', 'fish': 'Meat & Seafood', 'shrimp': 'Meat & Seafood',
-        'onion': 'Produce', 'garlic': 'Produce', 'potato': 'Produce', 'carrot': 'Produce', 'lettuce': 'Produce', 'tomato': 'Produce', 'apple': 'Produce', 'banana': 'Produce',
-        'salt': 'Spices & Seasonings', 'pepper': 'Spices & Seasonings', 'oregano': 'Spices & Seasonings', 'cumin': 'Spices & Seasonings',
-        'pasta': 'Pantry', 'rice': 'Pantry', 'canola oil': 'Pantry', 'olive oil': 'Pantry', 'vinegar': 'Pantry', 'broth': 'Pantry', 'canned tomato': 'Pantry',
-        'bread': 'Bakery', 'rolls': 'Bakery'
+        'onion': 'Produce', 'garlic': 'Produce', 'potato': 'Produce', 'carrot': 'Produce', 'lettuce': 'Produce', 'tomato': 'Produce', 'apple': 'Produce', 'banana': 'Produce', 'berry': 'Produce', 'lemon': 'Produce', 'lime': 'Produce',
+        'salt': 'Spices & Seasonings', 'pepper': 'Spices & Seasonings', 'oregano': 'Spices & Seasonings', 'cumin': 'Spices & Seasonings', 'basil': 'Spices & Seasonings', 'thyme': 'Spices & Seasonings', 'paprika': 'Spices & Seasonings',
+        'pasta': 'Pantry', 'rice': 'Pantry', 'canola oil': 'Pantry', 'olive oil': 'Pantry', 'vinegar': 'Pantry', 'broth': 'Pantry', 'canned tomato': 'Pantry', 'beans': 'Pantry', 'cereal': 'Pantry', 'coffee': 'Pantry', 'tea': 'Pantry',
+        'bread': 'Bakery', 'rolls': 'Bakery', 'baguette': 'Bakery'
     };
 
     function getAisleSuggestion(ingredientName) {
         // First, check if the ingredient has an explicit aisle defined by the user
         const aisleMatch = ingredientName.match(/(\s*\/\/\s*)([^/]+)$/);
         if (aisleMatch && aisleMatch[2]) {
-            return aisleMatch[2].trim().replace(/\s{2,}/g, ' ').replace(/(^|\s)\S/g, l => l.toUpperCase()); // Capitalize words
+            // Capitalize first letter of each word in the aisle name
+            return aisleMatch[2].trim().replace(/\s{2,}/g, ' ').replace(/(^|\s)\S/g, l => l.toUpperCase()); 
         }
 
         // If not, use the default map
         for (const [key, aisle] of Object.entries(defaultAisleMap)) {
+            // Check if the ingredient name contains the key
             if (ingredientName.includes(key)) {
                 return aisle;
             }
@@ -882,19 +962,14 @@
         let original = ingredientString.toLowerCase().trim();
         let quantity = 0;
         let unit = '';
-        let name = original; 
-        let aisle = getAisleSuggestion(original); // Get aisle before stripping parts
-
-        console.log(`--- Parsing "${original}" ---`);
-
-        let remaining = original;
+        let aisle = getAisleSuggestion(original); 
 
         // Strip user-defined aisle hint before parsing quantities/units
+        let remaining = original;
         const aisleHintRemovedMatch = remaining.match(/^(.*?)(?:\s*\/\/\s*[^/]+)$/);
         if (aisleHintRemovedMatch) {
             remaining = aisleHintRemovedMatch[1].trim();
         }
-
 
         // 1. Try to extract Quantity
         const qtyMatch = remaining.match(quantityRegex);
@@ -917,13 +992,10 @@
         } else {
             quantity = 1; 
         }
-        console.log(`  Quantity: ${quantity}`);
-        console.log(`  Remaining after qty: "${remaining}"`);
 
         // 2. Try to extract Unit
         const sortedUnits = Object.keys(unitMap).sort((a, b) => b.length - a.length);
-        let foundUnitMatch = false;
-
+        
         for (const u of sortedUnits) {
             const unitMatchRegex = new RegExp(`^(${u})(?:s|\\.)?(?:\\s+of\\b|\\b)?`, 'i');
             const matchInRemaining = remaining.match(unitMatchRegex);
@@ -931,14 +1003,11 @@
             if (matchInRemaining) {
                 unit = unitMap[u]; // Use normalized unit
                 remaining = remaining.substring(matchInRemaining[0].length).trim();
-                foundUnitMatch = true;
                 break; 
             }
         }
-        console.log(`  Unit: "${unit}" (found: ${foundUnitMatch})`);
-        console.log(`  Remaining after unit: "${remaining}"`);
 
-        name = remaining;
+        let name = remaining;
 
         // 3. Strip common descriptors from the name
         let cleanedName = name;
@@ -963,9 +1032,6 @@
         
         cleanedName = cleanedName.replace(/^[^a-z0-9]*/i, '').trim();
         
-        console.log(`  Cleaned Name: "${cleanedName}"`);
-        console.log(`--- End Parsing ---`);
-
         return {
             quantity: quantity,
             unit: unit,
@@ -1031,7 +1097,6 @@
             const parsed = normalizeIngredientName(line);
 
             // Create a consistent aggregation key: "name (unit)"
-            // Aisle is used for grouping, not for aggregation key
             let aggKey = parsed.name;
             if (parsed.unit) {
                 aggKey += ` (${parsed.unit})`;
@@ -1053,16 +1118,18 @@
             itemsByAisle[aisleName].push(item);
         });
 
-        // Sort aisles (e.g., Produce, Dairy, Meat, Pantry, etc.)
+        // Sort aisles for display
+        const customAisleOrder = [
+            'Produce', 'Bakery', 'Meat & Seafood', 'Dairy', 'Frozen', 'Pantry', 'Baking', 
+            'Spices & Seasonings', 'Beverages', 'Canned Goods', 'Other'
+        ];
         const sortedAisles = Object.keys(itemsByAisle).sort((a, b) => {
-            // Custom sort order for common aisles
-            const order = ['Produce', 'Bakery', 'Meat & Seafood', 'Dairy', 'Frozen', 'Pantry', 'Baking', 'Spices & Seasonings', 'Beverages', 'Canned Goods', 'Other'];
-            const indexA = order.indexOf(a);
-            const indexB = order.indexOf(b);
-            if (indexA === -1 && indexB === -1) return a.localeCompare(b); // Both not in custom order
-            if (indexA === -1) return 1; // A is not in custom order, so B comes first
-            if (indexB === -1) return -1; // B is not in custom order, so A comes first
-            return indexA - indexB; // Sort by custom order
+            const indexA = customAisleOrder.indexOf(a);
+            const indexB = customAisleOrder.indexOf(b);
+            if (indexA === -1 && indexB === -1) return a.localeCompare(b);
+            if (indexA === -1) return 1;
+            if (indexB === -1) return -1;
+            return indexA - indexB;
         });
 
 
@@ -1138,6 +1205,10 @@
                 showView(viewName);
             } else {
                 showView('recipes'); 
+            }
+            // Close the detail modal if recipe was deleted from there
+            if (document.getElementById('detailModal').classList.contains('active')) {
+                document.getElementById('detailModal').classList.remove('active');
             }
         } catch (e) { alert("Error deleting recipe."); console.error(e); }
     }
@@ -1223,6 +1294,8 @@
         });
 
         document.getElementById('detailModal').classList.add('active');
+        // Set the recipe ID for the detail delete button
+        document.getElementById('btnDeleteRecipeDetail').dataset.recipeId = r.id; 
     }
 
     function renderIngredientsInDetail(r, scale) {
@@ -1256,6 +1329,86 @@
 
     function updateStars(el, val) {
         Array.from(el.children).forEach(s => s.classList.toggle('filled', parseInt(s.getAttribute('data-v')) <= val));
+    }
+
+    // --- UNIT CONVERSION LOGIC ---
+
+    const CONVERSION_FACTORS = {
+        // All units convert to a base unit (ml for volume, g for weight)
+        volume: {
+            'tsp': 4.92892,
+            'tbsp': 14.7868,
+            'cup': 236.588,
+            'floz': 29.5735,
+            'ml': 1,
+            'l': 1000
+        },
+        weight: {
+            'g': 1,
+            'oz_w': 28.3495, // oz (weight)
+            'lb': 453.592,
+            'kg': 1000
+        }
+    };
+
+    function populateUnitSelects() {
+        const inputSelect = document.getElementById('convertInputUnit');
+        const outputSelect = document.getElementById('convertOutputUnit');
+        inputSelect.innerHTML = '';
+        outputSelect.innerHTML = '';
+
+        const allUnits = [...Object.keys(CONVERSION_FACTORS.volume), ...Object.keys(CONVERSION_FACTORS.weight)];
+        allUnits.forEach(unit => {
+            const option1 = document.createElement('option');
+            option1.value = unit;
+            option1.textContent = unit;
+            inputSelect.appendChild(option1);
+
+            const option2 = document.createElement('option');
+            option2.value = unit;
+            option2.textContent = unit;
+            outputSelect.appendChild(option2);
+        });
+
+        // Set default selections
+        inputSelect.value = 'tbsp';
+        outputSelect.value = 'cup';
+    }
+
+    function getUnitType(unit) {
+        if (CONVERSION_FACTORS.volume[unit]) return 'volume';
+        if (CONVERSION_FACTORS.weight[unit]) return 'weight';
+        return null;
+    }
+
+    function convertUnits() {
+        const qty = parseFloat(document.getElementById('convertInputQty').value);
+        const fromUnit = document.getElementById('convertInputUnit').value;
+        const toUnit = document.getElementById('convertOutputUnit').value;
+        const outputSpan = document.getElementById('convertOutputQty');
+
+        if (isNaN(qty) || qty <= 0) {
+            outputSpan.textContent = "Invalid Qty";
+            return;
+        }
+
+        const fromType = getUnitType(fromUnit);
+        const toType = getUnitType(toUnit);
+
+        if (!fromType || !toType) {
+            outputSpan.textContent = "Unknown Unit";
+            return;
+        }
+
+        if (fromType !== toType) {
+            outputSpan.textContent = "Can't convert volume to weight directly.";
+            return;
+        }
+
+        const baseUnitValue = qty * CONVERSION_FACTORS[fromType][fromUnit];
+        const convertedValue = baseUnitValue / CONVERSION_FACTORS[toType][toUnit];
+
+        outputSpan.textContent = convertedValue.toFixed(2);
     }
 
     // --- EVENT LISTENERS ---
@@ -1311,10 +1464,8 @@
         ['recipes','mealPlan','shopping','favorites'].forEach(x=>document.getElementById(`${x}View`).style.display='none');
         document.getElementById(`${v}View`).style.display='block';
         
-        // Hide/Show tag filter based on view
         document.getElementById('recipeControls').style.display = v==='recipes'?'flex':'none';
 
-        // Specific rendering logic for each view
         if(v==='recipes') renderRecipeList();
         else if(v==='mealPlan') renderMealPlanGrid();
         else if(v==='shopping') renderShoppingList();
@@ -1406,7 +1557,6 @@
     
     // Search & Filter
     document.getElementById('searchInput').oninput = renderRecipeList;
-    // Tag Filter is now handled by buttons in renderTagFilters()
     
     // Servings Scaling
     document.getElementById('detDesiredServings').oninput = (e) => {
@@ -1427,7 +1577,7 @@
 
     document.getElementById('btnPrint').onclick = () => window.print();
 
-    // Add New Category (now adds new Tag)
+    // Add New Tag
     document.getElementById('btnAddCat').onclick = async () => {
         const inputField = document.getElementById('inpNewCat');
         const val = inputField.value.trim();
@@ -1435,15 +1585,11 @@
             allTags.push(val);
             allTags.sort();
             await saveGlobalTags(); 
-            // The tag input is 'inpTags', not 'inpCategory'
-            // We could add this new tag directly to the current recipe's tags if needed
-            // For now, just making it available.
-            inputField.value = ''; // Clear new tag input
+            inputField.value = ''; 
         } else if (val) {
             alert(`Tag "${val}" already exists.`);
         }
     };
-
 
     // Meal Plan Week Select
     document.getElementById('mealPlanWeekSelect').onchange = () => { 
@@ -1494,6 +1640,20 @@
             checkbox.checked = false;
             checkbox.closest('.shopping-item').classList.remove('checked');
         });
+    };
+
+    // Unit Converter Event Listeners
+    document.getElementById('convertBtn').onclick = convertUnits;
+    document.getElementById('convertInputQty').oninput = convertUnits;
+    document.getElementById('convertInputUnit').onchange = convertUnits;
+    document.getElementById('convertOutputUnit').onchange = convertUnits;
+
+    // Delete button in Detail Modal
+    document.getElementById('btnDeleteRecipeDetail').onclick = (e) => {
+        const recipeIdToDelete = e.target.dataset.recipeId;
+        if (recipeIdToDelete) {
+            deleteRecipe(recipeIdToDelete);
+        }
     };
 
     init();
